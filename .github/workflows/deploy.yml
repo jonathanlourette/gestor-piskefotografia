@@ -1,0 +1,42 @@
+name: Deploy
+
+on:
+  push:
+    branches: [ "main"]
+
+concurrency: production_environment
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: mbstring, intl, curl, xml, zip
+
+      - name: Install Dependencies (Runner)
+        run: composer install --prefer-dist --no-progress --no-scripts
+
+      - name: Setup SSH Key
+        run: |
+          mkdir -p ~/.ssh/
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          chown -R $USER:$USER ~/.ssh
+
+      - name: Add Server to Known Hosts
+        run: |
+          ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
+      - name: Test SSH Connection
+        run: |
+          ssh -o BatchMode=yes -o ConnectTimeout=5 ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} 'echo "Conexão SSH OK"'
+      - name: Run Deployer
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          CI: true
+        run: |
+          vendor/bin/dep deploy
