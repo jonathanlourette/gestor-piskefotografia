@@ -1,7 +1,10 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
+/**
+ * Web routes are now managed by Mini App Service Providers.
+ *
+ * @see SiteServiceProvider
+ * @see AdminServiceProvider
+ */
 
-Route::get('/', function () {
-    return view('welcome');
-});
+// All routes are registered via Mini App Service Providers.
