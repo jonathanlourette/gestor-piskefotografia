@@ -157,7 +157,7 @@
             },
 
             async removeItem(productId) {
-                if (!confirm('Deseja realmente remover este item do carrinho?')) {
+                if (!await window.confirmModal('Deseja realmente remover este item do carrinho?')) {
                     return;
                 }
 
@@ -196,7 +196,7 @@
             },
 
             async clearCart() {
-                if (!confirm('Deseja realmente limpar todo o carrinho?')) {
+                if (!await window.confirmModal('Deseja realmente limpar todo o carrinho?')) {
                     return;
                 }
 

@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace App\Apps\Site\Controllers;
 
 use App\Domains\Order\Actions\CreateOrderAction;
+use App\Domains\Order\Actions\RemoveOrderPhotoAction;
 use App\Domains\Order\Actions\RetrieveOrderAction;
 use App\Domains\Order\Actions\UploadOrderPhotoAction;
 use App\Support\Exceptions\BusinessException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 class OrderController extends BaseSiteController
@@ -136,9 +138,15 @@ class OrderController extends BaseSiteController
                     'id' => $photo->id,
                     's3_path' => $photo->s3_path,
                     'original_name' => $photo->original_name,
+                    'url' => $photo->temporary_url,
                 ],
             ]);
 
+        } catch (ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => collect($e->errors())->flatten()->first(),
+            ], 422);
         } catch (BusinessException $e) {
             return response()->json([
                 'success' => false,
@@ -150,6 +158,54 @@ class OrderController extends BaseSiteController
             return response()->json([
                 'success' => false,
                 'message' => 'Não foi possível enviar a foto. Tente novamente.',
+            ], 500);
+        }
+    }
+
+    /**
+     * Remove uma foto do pedido (banco e S3) via AJAX.
+     */
+    public function removePhoto(Request $request, int $id, RemoveOrderPhotoAction $action): JsonResponse
+    {
+        $pendingOrderId = session('pending_order_id');
+
+        if ((int) $pendingOrderId !== $id) {
+            abort(403, 'Acesso não autorizado a este pedido.');
+        }
+
+        try {
+            $request->validate([
+                'photo_id' => ['required', 'integer'],
+            ], [
+                'photo_id.required' => 'A foto é obrigatória.',
+            ]);
+
+            $action->setData([
+                'order_id' => $id,
+                'photo_id' => $request->input('photo_id'),
+            ])->perform();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Foto removida com sucesso!',
+            ]);
+
+        } catch (ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => collect($e->errors())->flatten()->first(),
+            ], 422);
+        } catch (BusinessException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        } catch (\Throwable $e) {
+            report($e);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Não foi possível remover a foto. Tente novamente.',
             ], 500);
         }
     }

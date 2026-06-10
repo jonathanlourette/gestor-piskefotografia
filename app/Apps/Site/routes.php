@@ -27,6 +27,7 @@ Route::controller(OrderController::class)->prefix('pedido')->name('site.order.')
     Route::post('/', 'store')->name('store');
     Route::get('/{id}/upload', 'upload')->name('upload');
     Route::post('/{id}/foto', 'uploadPhoto')->name('uploadPhoto');
+    Route::post('/{id}/foto/remover', 'removePhoto')->name('removePhoto');
     Route::post('/{id}/finalizar', 'finalize')->name('finalize');
     Route::get('/{id}/confirmacao', 'confirmation')->name('confirmation');
 });

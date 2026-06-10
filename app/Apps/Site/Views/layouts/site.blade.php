@@ -29,6 +29,22 @@
     .position-transparent.navbar-light .nav-link:hover {
         color: #ffffff !important;
     }
+    .floating-cart-btn {
+        top: 0.75rem;
+        right: 1.5rem;
+        width: 56px;
+        height: 56px;
+        z-index: 1035;
+        transition: transform 0.2s ease;
+    }
+    .floating-cart-btn:hover {
+        transform: scale(1.08);
+    }
+    @media (max-width: 991.98px) {
+        #mainNavbar .navbar-toggler {
+            margin-right: 4rem;
+        }
+    }
 </style>
 </head>
 <body>
@@ -36,11 +52,12 @@
     @php($headerSolid = (bool)($__env->yieldContent('header_solid')))
     <header
         id="mainNavbar"
-        class="navbar navbar-expand-lg navbar-light position-absolute w-100 transition-all"
+        class="navbar navbar-expand-lg navbar-light position-fixed w-100 transition-all"
         style="z-index: 10; top: 0; transition: all 0.3s ease;"
-        x-data="{ scrolled: {{ $headerSolid ? 'true' : 'false' }} }"
+        x-data="{ scrolled: window.scrollY > 50, hideAtTop: {{ $headerSolid ? 'true' : 'false' }} }"
         x-init="window.addEventListener('scroll', () => { scrolled = window.scrollY > 50; })"
         :class="scrolled ? 'bg-white shadow-sm' : 'bg-transparent'"
+        :style="hideAtTop && !scrolled ? 'transform: translateY(-110%);' : ''"
     >
         <div class="container-fluid px-4 px-lg-5">
             <a class="navbar-brand fw-bold" href="{{ route('site.landing.index') }}">
@@ -67,25 +84,24 @@
                     </li>
                 </ul>
 
-                <div class="d-flex align-items-center gap-3">
-                    <button
-                        type="button"
-                        class="btn position-transparent btn-sm position-relative"
-                        :class="scrolled ? 'btn-outline-dark' : 'btn-outline-light'"
-                        data-bs-toggle="offcanvas"
-                        data-bs-target="#cartOffcanvas"
-                        aria-controls="cartOffcanvas"
-                        x-data="{ cartCount: 0 }"
-                        x-init="window.addEventListener('cart-badge-update', (e) => cartCount = e.detail.count)"
-                        @cart-badge-update.window="cartCount = $event.detail.count"
-                    >
-                        <i class="bi bi-cart3 fs-4"></i>
-                        <span class="badge bg-danger position-absolute top-0 start-100 translate-middle rounded-pill cart-badge" x-show="cartCount > 0" x-text="cartCount"></span>
-                    </button>
-                </div>
             </div>
         </div>
     </header>
+
+    <!-- Botão Flutuante do Carrinho -->
+    <button
+        type="button"
+        class="btn btn-dark rounded-circle shadow-lg position-fixed d-flex align-items-center justify-content-center floating-cart-btn"
+        data-bs-toggle="offcanvas"
+        data-bs-target="#cartOffcanvas"
+        aria-controls="cartOffcanvas"
+        aria-label="Abrir carrinho"
+        x-data="{ cartCount: 0 }"
+        @cart-badge-update.window="cartCount = $event.detail.count"
+    >
+        <i class="bi bi-cart3 fs-4"></i>
+        <span class="badge bg-danger position-absolute rounded-pill" style="top: -4px; right: -4px; display: none;" x-show="cartCount > 0" x-text="cartCount"></span>
+    </button>
 
     <!-- Mobile Navigation Offcanvas -->
     <div class="offcanvas offcanvas-start" tabindex="-1" id="mobileNavOffcanvas" aria-labelledby="mobileNavOffcanvasLabel">
@@ -186,8 +202,53 @@
     <!-- Offcanvas do Carrinho -->
     @include('site::cart.offcanvas')
 
+    <!-- Modal de Confirmação Global -->
+    <div class="modal fade" id="confirmModal" tabindex="-1" aria-labelledby="confirmModalMessage" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content border-0 rounded-4 shadow-lg">
+                <div class="modal-body text-center p-4 pb-3">
+                    <div class="bg-danger-subtle text-danger rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 56px; height: 56px;">
+                        <i class="bi bi-exclamation-triangle-fill fs-4"></i>
+                    </div>
+                    <p class="fw-semibold text-dark mb-0" id="confirmModalMessage"></p>
+                </div>
+                <div class="modal-footer border-0 pt-0 px-4 pb-4">
+                    <div class="d-flex gap-2 w-100">
+                        <button type="button" class="btn btn-light rounded-4 fw-medium flex-grow-1" data-bs-dismiss="modal">Cancelar</button>
+                        <button type="button" class="btn btn-danger rounded-4 fw-medium flex-grow-1" id="confirmModalOk">Confirmar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Alpine.js Global: Carrinho e Toast System -->
     <script>
+        // Confirmação via modal (substitui o confirm() nativo)
+        window.confirmModal = function (message) {
+            return new Promise((resolve) => {
+                const modalEl = document.getElementById('confirmModal');
+                const okBtn = document.getElementById('confirmModalOk');
+                document.getElementById('confirmModalMessage').textContent = message;
+
+                const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+                let confirmed = false;
+
+                const onOk = () => {
+                    confirmed = true;
+                    modal.hide();
+                };
+                okBtn.addEventListener('click', onOk, { once: true });
+
+                modalEl.addEventListener('hidden.bs.modal', () => {
+                    okBtn.removeEventListener('click', onOk);
+                    resolve(confirmed);
+                }, { once: true });
+
+                modal.show();
+            });
+        };
+
         // Função global para adicionar ao carrinho via AJAX
         async function addToCart(productId, productName, btnElement) {
             const originalHTML = btnElement.innerHTML;
@@ -219,8 +280,11 @@
                         detail: { type: 'success', message: productName + ' adicionado ao carrinho!' }
                     }));
 
+                    // Abre o offcanvas do carrinho para o cliente seguir ao checkout
+                    bootstrap.Offcanvas.getOrCreateInstance(document.getElementById('cartOffcanvas')).show();
+
                     // Feedback visual no botão
-                    btnElement.innerHTML = '<i class="bi bi-check-lg"></i> Adicionado!';
+                    btnElement.innerHTML = '<i class="bi bi-check-lg"></i> Adicionado ao carrinho!';
                     btnElement.classList.add('btn-success');
                     btnElement.classList.remove('btn-dark', 'btn-outline-dark');
 
@@ -234,7 +298,7 @@
                             btnElement.classList.add('btn-dark');
                         }
                         btnElement.disabled = false;
-                    }, 1500);
+                    }, 2500);
                 } else {
                     window.dispatchEvent(new CustomEvent('toast', {
                         detail: { type: 'error', message: data.message || 'Erro ao adicionar produto.' }

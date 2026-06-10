@@ -32,7 +32,9 @@ class S3StorageService extends StorageService
                 'visibility' => 'private',
             ];
 
-            Storage::disk('s3')->put($path, $fileContent, $options);
+            if (! Storage::disk('s3')->put($path, $fileContent, $options)) {
+                throw new StorageException('Não foi possível realizar o upload do arquivo. Tente novamente.');
+            }
 
             return $path;
         } catch (Throwable $e) {

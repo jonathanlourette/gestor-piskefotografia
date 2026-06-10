@@ -15,7 +15,7 @@
             'name' => $item->product->name,
             'photo_limit' => $item->product->photo_limit,
             'uploaded_count' => $item->photos->count(),
-            'photos' => $item->photos->map(fn($p) => ['id' => $p->id, 'original_name' => $p->original_name])
+            'photos' => $item->photos->map(fn($p) => ['id' => $p->id, 'original_name' => $p->original_name, 'url' => $p->temporary_url])
         ])->toJson() }}
     })" class="container-fluid px-4 px-lg-5 py-5">
         <div class="col-lg-8 mx-auto">
@@ -54,28 +54,9 @@
                         </template>
                     </div>
 
-                    <!-- Uploaded Photos Preview -->
-                    <template x-if="item.photos.length > 0">
-                        <div class="px-4 pb-3">
-                            <div class="d-flex flex-wrap gap-2">
-                                <template x-for="photo in item.photos" :key="photo.id">
-                                    <div class="position-relative rounded-3 overflow-hidden border border-secondary-subtle" style="width: 72px; height: 72px;">
-                                        <div class="w-100 h-100 bg-body-tertiary d-flex align-items-center justify-content-center">
-                                            <i class="bi bi-image text-secondary fs-4"></i>
-                                        </div>
-                                        <span class="position-absolute top-0 end-0 badge bg-success rounded-pill m-1" style="font-size: 0.6rem;">
-                                            <i class="bi bi-check"></i>
-                                        </span>
-                                        <div class="position-absolute bottom-0 start-0 end-0 text-truncate px-1 text-center" style="font-size: 0.55rem; background: rgba(0,0,0,0.55); color: #fff;" x-text="photo.original_name"></div>
-                                    </div>
-                                </template>
-                            </div>
-                        </div>
-                    </template>
-
                     <!-- Upload Zone (hidden when complete) -->
                     <template x-if="item.uploaded_count < item.photo_limit">
-                        <div class="px-4 pb-4">
+                        <div class="px-4 pb-3">
                             <!-- Drop Zone -->
                             <div class="rounded-4 text-center py-5 px-3 border-dashed position-relative transition-all"
                                  style="border-style: dashed !important; border-width: 2px; cursor: pointer;"
@@ -96,37 +77,79 @@
                                 <p class="text-body-secondary mb-0 fs-5">Arraste fotos aqui ou <span class="text-decoration-underline fw-semibold text-dark">clique para selecionar</span></p>
                                 <p class="text-body-secondary small mt-2 mb-0">JPG ou PNG · Máximo 15MB cada</p>
                             </div>
+                        </div>
+                    </template>
 
-                            <!-- Upload Queue -->
-                            <template x-if="item.queue && item.queue.length > 0">
-                                <div class="mt-3">
-                                    <template x-for="entry in item.queue" :key="entry.id">
-                                        <div class="d-flex align-items-center gap-3 py-3 px-4 rounded-4 mb-2 bg-body-tertiary border border-light">
-                                            <div class="bg-white rounded-circle d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
-                                                <i class="bi bi-image text-secondary"></i>
-                                            </div>
-                                            <div class="flex-grow-1 min-w-0">
-                                                <div class="small text-truncate fw-medium text-dark fs-5" x-text="entry.file.name"></div>
-                                                <template x-if="entry.status === 'uploading'">
-                                                    <div class="progress mt-2 bg-white rounded-pill" style="height: 6px;">
-                                                        <div class="progress-bar rounded-pill" role="progressbar"
-                                                             :style="`width: ${entry.progress}%; background: linear-gradient(135deg, #1a1a2e 0%, #0f0f23 100%);`"></div>
-                                                    </div>
-                                                </template>
-                                            </div>
-                                            <template x-if="entry.status === 'uploading'">
-                                                <span class="spinner-border spinner-border-sm text-secondary" role="status"></span>
+                    <!-- Miniaturas: fotos enviadas + uploads em andamento -->
+                    <template x-if="item.photos.length > 0 || item.queue.length > 0">
+                        <div class="px-4 pb-4">
+                            <div class="d-flex flex-wrap gap-3">
+                                <!-- Fotos já enviadas -->
+                                <template x-for="photo in item.photos" :key="'photo-' + photo.id">
+                                    <div class="position-relative" style="width: 96px;">
+                                        <div class="rounded-3 overflow-hidden border border-secondary-subtle bg-body-tertiary" style="width: 96px; height: 96px;">
+                                            <img :src="photo.url" :alt="photo.original_name" class="w-100 h-100" style="object-fit: cover;" loading="lazy">
+                                        </div>
+                                        <button type="button"
+                                                class="btn btn-danger rounded-circle position-absolute d-flex align-items-center justify-content-center p-0 shadow"
+                                                style="width: 28px; height: 28px; top: -9px; right: -9px;"
+                                                :disabled="photo.removing"
+                                                @click="removePhoto(item, photo)"
+                                                aria-label="Remover foto">
+                                            <span class="spinner-border spinner-border-sm" x-show="photo.removing" style="display: none; width: 13px; height: 13px;"></span>
+                                            <i class="bi bi-trash3-fill" x-show="!photo.removing" style="font-size: 0.78rem;"></i>
+                                        </button>
+                                        <div class="text-truncate text-center text-secondary mt-1" style="font-size: 0.65rem;" x-text="photo.original_name"></div>
+                                    </div>
+                                </template>
+
+                                <!-- Uploads em andamento / com erro -->
+                                <template x-for="entry in item.queue" :key="'queue-' + entry.id">
+                                    <div class="position-relative" style="width: 96px;">
+                                        <div class="rounded-3 overflow-hidden border position-relative bg-body-tertiary"
+                                             :class="entry.status === 'error' ? 'border-danger' : 'border-secondary-subtle'"
+                                             style="width: 96px; height: 96px;">
+                                            <img :src="entry.previewUrl" :alt="entry.file.name" class="w-100 h-100" style="object-fit: cover;"
+                                                 x-show="entry.status !== 'error'"
+                                                 x-on:error="$el.style.visibility = 'hidden'">
+                                            <template x-if="entry.status === 'pending'">
+                                                <div class="position-absolute top-0 start-0 w-100 h-100 d-flex flex-column align-items-center justify-content-center gap-1" style="background: rgba(255, 255, 255, 0.65);">
+                                                    <i class="bi bi-clock text-secondary fs-5"></i>
+                                                    <span class="text-secondary fw-medium" style="font-size: 0.65rem;">Na fila</span>
+                                                </div>
                                             </template>
-                                            <template x-if="entry.status === 'success'">
-                                                <i class="bi bi-check-circle-fill text-success fs-5"></i>
+                                            <template x-if="entry.status === 'uploading'">
+                                                <div class="position-absolute top-0 start-0 w-100 h-100 d-flex flex-column align-items-center justify-content-center gap-1" style="background: rgba(15, 15, 35, 0.55);">
+                                                    <span class="spinner-border spinner-border-sm text-white" x-show="entry.progress >= 100"></span>
+                                                    <span class="text-white fw-bold small" x-show="entry.progress < 100" x-text="`${entry.progress}%`"></span>
+                                                    <div class="progress rounded-pill" style="height: 5px; width: 70%; background: rgba(255, 255, 255, 0.3);">
+                                                        <div class="progress-bar progress-bar-striped progress-bar-animated bg-white rounded-pill"
+                                                             :style="`width: ${entry.progress}%; transition: width 0.2s ease;`"></div>
+                                                    </div>
+                                                </div>
                                             </template>
                                             <template x-if="entry.status === 'error'">
-                                                <i class="bi bi-x-circle-fill text-danger fs-5" :title="entry.errorMessage"></i>
+                                                <div class="position-absolute top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" style="background: rgba(220, 53, 69, 0.75);">
+                                                    <i class="bi bi-x-lg text-white fw-bold" style="font-size: 2rem; -webkit-text-stroke: 1.5px #fff;"></i>
+                                                </div>
                                             </template>
                                         </div>
-                                    </template>
-                                </div>
-                            </template>
+                                        <template x-if="entry.status === 'error'">
+                                            <button type="button"
+                                                    class="btn btn-danger rounded-circle position-absolute d-flex align-items-center justify-content-center p-0 shadow"
+                                                    style="width: 28px; height: 28px; top: -9px; right: -9px;"
+                                                    @click="removeQueueEntry(item, entry)"
+                                                    aria-label="Descartar">
+                                                <i class="bi bi-x-lg" style="font-size: 0.78rem;"></i>
+                                            </button>
+                                        </template>
+                                        <div class="text-truncate text-center mt-1"
+                                             :class="entry.status === 'error' ? 'text-danger fw-medium' : 'text-secondary'"
+                                             style="font-size: 0.65rem;"
+                                             x-text="entry.status === 'error' ? entry.errorMessage : entry.file.name"></div>
+                                    </div>
+                                </template>
+                            </div>
                         </div>
                     </template>
                 </div>
@@ -160,9 +183,13 @@
                 orderId: initialState.orderId,
                 items: initialState.items.map(item => ({
                     ...item,
+                    photos: item.photos.map(photo => ({ ...photo, removing: false })),
                     queue: [],
                     dragover: false,
                 })),
+                pendingJobs: [],
+                activeUploads: 0,
+                maxConcurrentUploads: 2,
 
                 get totalUploaded() {
                     return this.items.reduce((sum, item) => sum + item.uploaded_count, 0);
@@ -197,23 +224,87 @@
                     const remaining = item.photo_limit - item.uploaded_count;
                     const toUpload = files.slice(0, remaining);
 
+                    if (files.length > remaining) {
+                        window.dispatchEvent(new CustomEvent('toast', {
+                            detail: { type: 'warning', message: `Limite de ${item.photo_limit} fotos: apenas ${remaining} foto(s) serão enviadas.` }
+                        }));
+                    }
+
                     toUpload.forEach(file => {
                         const entry = {
                             id: Date.now() + Math.random(),
                             file: file,
-                            status: 'uploading',
+                            previewUrl: URL.createObjectURL(file),
+                            status: 'pending',
                             progress: 0,
                             errorMessage: '',
                         };
                         item.queue.push(entry);
-                        this.uploadFile(item, entry);
+                        // Entry reativa para a UI atualizar; File cru para o FormData (proxy quebra o envio)
+                        this.pendingJobs.push({ item, entry: item.queue[item.queue.length - 1], file });
                     });
+
+                    this.pumpUploadQueue();
                 },
 
-                uploadFile(item, entry) {
+                pumpUploadQueue() {
+                    while (this.activeUploads < this.maxConcurrentUploads && this.pendingJobs.length > 0) {
+                        const job = this.pendingJobs.shift();
+                        this.activeUploads++;
+                        job.entry.status = 'uploading';
+                        this.uploadFile(job.item, job.entry, job.file);
+                    }
+                },
+
+                removeQueueEntry(item, entry) {
+                    item.queue = item.queue.filter(e => e.id !== entry.id);
+                    setTimeout(() => URL.revokeObjectURL(entry.previewUrl), 1000);
+                },
+
+                async removePhoto(item, photo) {
+                    if (!await window.confirmModal('Deseja realmente remover esta foto do pedido?')) {
+                        return;
+                    }
+
+                    photo.removing = true;
+
+                    try {
+                        const response = await fetch('{{ route("site.order.removePhoto", $order->id) }}', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                            },
+                            body: JSON.stringify({ photo_id: photo.id }),
+                        });
+
+                        const data = await response.json();
+
+                        if (data.success) {
+                            item.photos = item.photos.filter(p => p.id !== photo.id);
+                            item.uploaded_count--;
+                            window.dispatchEvent(new CustomEvent('toast', {
+                                detail: { type: 'success', message: data.message || 'Foto removida com sucesso!' }
+                            }));
+                        } else {
+                            photo.removing = false;
+                            window.dispatchEvent(new CustomEvent('toast', {
+                                detail: { type: 'error', message: data.message || 'Erro ao remover a foto.' }
+                            }));
+                        }
+                    } catch {
+                        photo.removing = false;
+                        window.dispatchEvent(new CustomEvent('toast', {
+                            detail: { type: 'error', message: 'Erro de conexão. Tente novamente.' }
+                        }));
+                    }
+                },
+
+                uploadFile(item, entry, file) {
                     const formData = new FormData();
                     formData.append('order_item_id', item.id);
-                    formData.append('photo', entry.file);
+                    formData.append('photo', file);
 
                     const xhr = new XMLHttpRequest();
 
@@ -234,8 +325,11 @@
                                         item.photos.push({
                                             id: response.photo.id,
                                             original_name: response.photo.original_name,
+                                            url: response.photo.url,
+                                            removing: false,
                                         });
                                     }
+                                    this.removeQueueEntry(item, entry);
                                 } else {
                                     entry.status = 'error';
                                     entry.errorMessage = response.message || 'Erro no upload.';
@@ -258,6 +352,12 @@
                     xhr.addEventListener('error', () => {
                         entry.status = 'error';
                         entry.errorMessage = 'Erro de conexão. Tente novamente.';
+                    });
+
+                    // Libera a vaga na fila ao terminar (sucesso, erro ou abort)
+                    xhr.addEventListener('loadend', () => {
+                        this.activeUploads--;
+                        this.pumpUploadQueue();
                     });
 
                     xhr.open('POST', '{{ route("site.order.uploadPhoto", $order->id) }}');
