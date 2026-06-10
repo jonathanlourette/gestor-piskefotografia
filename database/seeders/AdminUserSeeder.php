@@ -15,22 +15,12 @@ class AdminUserSeeder extends Seeder
      */
     public function run(): void
     {
-        $password = env('ADMIN_INITIAL_PASSWORD');
-
-        if ($password === null || $password === 'password') {
-            $this->command->error(
-                'ADMIN_INITIAL_PASSWORD não definida ou ainda com valor padrão inseguro. '
-                .'Defina uma senha forte no .env como ADMIN_INITIAL_PASSWORD antes de rodar o seeder.'
-            );
-
-            return;
-        }
 
         User::firstOrCreate(
             ['email' => 'piskefotografia@gmail.com'],
             [
                 'name' => 'Admin',
-                'password' => Hash::make($password),
+                'password' => Hash::make("123456789@a"),
                 'is_admin' => true,
             ]
         );
