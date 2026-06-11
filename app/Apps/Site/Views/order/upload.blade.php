@@ -172,7 +172,7 @@
                                         </template>
                                         <div class="text-truncate text-center mt-1 text-secondary"
                                              style="font-size: 0.65rem;"
-                                             x-text="entry.file.name"></div>
+                                             x-text="entry.fileName"></div>
                                         <template x-if="entry.status === 'error' && entry.errorMessage">
                                             <div class="text-danger fw-medium text-center"
                                                  style="font-size: 0.55rem; line-height: 1.2;"
@@ -209,6 +209,9 @@
 
 @push('scripts')
     <script>
+        // Mapa não-reativo para guardar File objects crus (proxy do Alpine quebra o FormData)
+        var rawFiles = new Map();
+
         function orderUpload(initialState) {
             return {
                 orderId: initialState.orderId,
@@ -273,16 +276,18 @@
 
                     var toUpload = files.slice(0, remaining);
                     toUpload.forEach(file => {
+                        const entryId = Date.now() + Math.random();
                         const entry = {
-                            id: Date.now() + Math.random(),
-                            file: file,
+                            id: entryId,
+                            fileName: file.name,
                             previewUrl: '',
                             status: 'pending',
                             progress: 0,
                             errorMessage: '',
                         };
+                        // Guarda o File cru fora da reatividade do Alpine
+                        rawFiles.set(entryId, file);
                         item.queue.push(entry);
-                        // Entry reativa para a UI atualizar; File cru para o FormData (proxy quebra o envio)
                         const reactiveEntry = item.queue[item.queue.length - 1];
                         this.makePreview(file).then(url => { reactiveEntry.previewUrl = url; });
                         this.pendingJobs.push({ item, entry: reactiveEntry, file });
@@ -408,14 +413,17 @@
                     if (index !== -1) {
                         item.queue.splice(index, 1);
                     }
+                    rawFiles.delete(entry.id);
                     setTimeout(() => { if (entry.previewUrl) URL.revokeObjectURL(entry.previewUrl); }, 1000);
                 },
 
                 retryUpload(item, entry) {
+                    var rawFile = rawFiles.get(entry.id);
+                    if (!rawFile) return;
                     entry.status = 'pending';
                     entry.progress = 0;
                     entry.errorMessage = '';
-                    this.pendingJobs.push({ item: item, entry: entry, file: entry.file });
+                    this.pendingJobs.push({ item: item, entry: entry, file: rawFile });
                     this.pumpUploadQueue();
                 },
 
