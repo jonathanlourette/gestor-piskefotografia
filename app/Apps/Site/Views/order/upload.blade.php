@@ -150,8 +150,14 @@
                                                 </div>
                                             </template>
                                             <template x-if="entry.status === 'error'">
-                                                <div class="position-absolute top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" style="background: rgba(220, 53, 69, 0.75);">
-                                                    <i class="bi bi-x-lg text-white fw-bold" style="font-size: 2rem; -webkit-text-stroke: 1.5px #fff;"></i>
+                                                <div class="position-absolute top-0 start-0 w-100 h-100 d-flex flex-column align-items-center justify-content-center gap-1" style="background: rgba(220, 53, 69, 0.75);">
+                                                    <i class="bi bi-x-lg text-white fw-bold" style="font-size: 1.5rem; -webkit-text-stroke: 1.5px #fff;"></i>
+                                                    <button type="button"
+                                                            class="btn btn-sm btn-light rounded-pill px-2 py-0"
+                                                            style="font-size: 0.55rem;"
+                                                            x-on:click="retryUpload(item, entry)">
+                                                        <i class="bi bi-arrow-clockwise"></i> Repetir
+                                                    </button>
                                                 </div>
                                             </template>
                                         </div>
@@ -164,10 +170,14 @@
                                                 <i class="bi bi-x-lg" style="font-size: 0.78rem;"></i>
                                             </button>
                                         </template>
-                                        <div class="text-truncate text-center mt-1"
-                                             :class="entry.status === 'error' ? 'text-danger fw-medium' : 'text-secondary'"
+                                        <div class="text-truncate text-center mt-1 text-secondary"
                                              style="font-size: 0.65rem;"
-                                             x-text="entry.status === 'error' ? entry.errorMessage : entry.file.name"></div>
+                                             x-text="entry.file.name"></div>
+                                        <template x-if="entry.status === 'error' && entry.errorMessage">
+                                            <div class="text-danger fw-medium text-center"
+                                                 style="font-size: 0.55rem; line-height: 1.2;"
+                                                 x-text="entry.errorMessage"></div>
+                                        </template>
                                     </div>
                                 </template>
                             </div>
@@ -226,6 +236,10 @@
                 },
 
                 get allComplete() {
+                    var hasErrors = this.items.some(function(item) {
+                        return item.queue.some(function(e) { return e.status === 'error'; });
+                    });
+                    if (hasErrors) return false;
                     return this.items.every(item => item.uploaded_count >= item.photo_limit);
                 },
 
@@ -397,6 +411,14 @@
                     setTimeout(() => { if (entry.previewUrl) URL.revokeObjectURL(entry.previewUrl); }, 1000);
                 },
 
+                retryUpload(item, entry) {
+                    entry.status = 'pending';
+                    entry.progress = 0;
+                    entry.errorMessage = '';
+                    this.pendingJobs.push({ item: item, entry: entry, file: entry.file });
+                    this.pumpUploadQueue();
+                },
+
                 async removePhoto(item, photo) {
                     if (!await window.confirmModal('Deseja realmente remover esta foto do pedido?')) {
                         return;
@@ -496,9 +518,17 @@
                              entry.status = 'error';
                              try {
                                  const response = JSON.parse(xhr.responseText);
-                                 entry.errorMessage = response.message || ('Erro ' + xhr.status);
+                                 var msg = response.message || ('Erro ' + xhr.status);
+                                 if (msg === 'validation.uploaded') {
+                                     msg = 'Falha no envio. Tente novamente.';
+                                 }
+                                 entry.errorMessage = msg;
                              } catch {
-                                 entry.errorMessage = 'Erro ' + xhr.status;
+                                 if (xhr.status === 413) {
+                                     entry.errorMessage = 'Arquivo muito grande.';
+                                 } else {
+                                     entry.errorMessage = 'Erro ' + xhr.status;
+                                 }
                              }
                         }
                     });
