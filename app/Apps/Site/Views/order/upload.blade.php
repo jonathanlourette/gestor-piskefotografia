@@ -304,16 +304,27 @@
                  */
                 async makePreview(file) {
                     try {
-                        const bitmap = await createImageBitmap(file, { resizeWidth: 192, resizeQuality: 'low' });
-                        const canvas = document.createElement('canvas');
-                        canvas.width = bitmap.width;
-                        canvas.height = bitmap.height;
-                        canvas.getContext('2d').drawImage(bitmap, 0, 0);
-                        bitmap.close();
+                        var img = new Image();
+                        var objectUrl = URL.createObjectURL(file);
 
-                        return await new Promise(resolve => {
+                        await new Promise(function(resolve, reject) {
+                            img.onload = resolve;
+                            img.onerror = function() { reject(new Error('Falha ao criar preview')); };
+                            img.src = objectUrl;
+                        });
+
+                        var ratio = Math.min(192 / img.naturalWidth, 192 / img.naturalHeight, 1);
+                        var canvas = document.createElement('canvas');
+                        canvas.width = Math.round(img.naturalWidth * ratio);
+                        canvas.height = Math.round(img.naturalHeight * ratio);
+                        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+
+                        URL.revokeObjectURL(objectUrl);
+                        img.src = '';
+
+                        return await new Promise(function(resolve) {
                             canvas.toBlob(
-                                blob => resolve(blob ? URL.createObjectURL(blob) : URL.createObjectURL(file)),
+                                function(blob) { resolve(blob ? URL.createObjectURL(blob) : URL.createObjectURL(file)); },
                                 'image/jpeg',
                                 0.7
                             );
@@ -335,33 +346,48 @@
                         return file;
                     }
 
+                    // Usa canvas para decodificar QUALQUER formato (HEIC, WebP, etc)
+                    // e sempre converter para JPEG — o backend só aceita JPG/PNG.
+                    var maxDim = 4000;
+                    var img = new Image();
+
+                    var objectUrl = URL.createObjectURL(file);
+
                     try {
-                        const bitmap = await createImageBitmap(file);
-                        var maxDim = 4000;
+                        await new Promise(function(resolve, reject) {
+                            img.onload = resolve;
+                            img.onerror = function() { reject(new Error('Falha ao decodificar imagem')); };
+                            img.src = objectUrl;
+                        });
 
-                        if (bitmap.width <= maxDim && bitmap.height <= maxDim && file.size <= 4 * 1024 * 1024) {
-                            bitmap.close();
-                            return file; // Já é pequena o suficiente
-                        }
+                        var ratio = Math.min(maxDim / img.naturalWidth, maxDim / img.naturalHeight, 1);
+                        var w = Math.round(img.naturalWidth * ratio);
+                        var h = Math.round(img.naturalHeight * ratio);
 
-                        var ratio = Math.min(maxDim / bitmap.width, maxDim / bitmap.height, 1);
                         var canvas = document.createElement('canvas');
-                        canvas.width = Math.round(bitmap.width * ratio);
-                        canvas.height = Math.round(bitmap.height * ratio);
+                        canvas.width = w;
+                        canvas.height = h;
 
                         var ctx = canvas.getContext('2d');
                         ctx.fillStyle = '#ffffff';
-                        ctx.fillRect(0, 0, canvas.width, canvas.height);
-                        ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-                        bitmap.close();
+                        ctx.fillRect(0, 0, w, h);
+                        ctx.drawImage(img, 0, 0, w, h);
 
                         var blob = await new Promise(function(resolve) {
                             canvas.toBlob(function(b) { resolve(b); }, 'image/jpeg', 0.85);
                         });
 
+                        // Limpa memória
+                        img.src = '';
+                        canvas.width = 1;
+                        canvas.height = 1;
+
                         return new File([blob], file.name.replace(/\.\w+$/, '.jpg'), { type: 'image/jpeg' });
                     } catch {
-                        return file; // Fallback: envia original
+                        // Se não conseguiu decodificar, envia original e deixa o backend rejeitar
+                        return file;
+                    } finally {
+                        URL.revokeObjectURL(objectUrl);
                     }
                 },
 
@@ -372,27 +398,37 @@
                  */
                 async makeThumbnail(file) {
                     try {
-                        const bitmap = await createImageBitmap(file);
-                        const maxSize = 600;
+                        var img = new Image();
+                        var objectUrl = URL.createObjectURL(file);
 
-                        if (bitmap.width <= maxSize && bitmap.height <= maxSize) {
-                            bitmap.close();
+                        await new Promise(function(resolve, reject) {
+                            img.onload = resolve;
+                            img.onerror = function() { reject(new Error('Falha ao criar thumbnail')); };
+                            img.src = objectUrl;
+                        });
+
+                        var maxSize = 600;
+
+                        if (img.naturalWidth <= maxSize && img.naturalHeight <= maxSize) {
+                            URL.revokeObjectURL(objectUrl);
                             return null; // Servidor usa a própria foto como miniatura
                         }
 
-                        const ratio = Math.min(maxSize / bitmap.width, maxSize / bitmap.height);
-                        const canvas = document.createElement('canvas');
-                        canvas.width = Math.round(bitmap.width * ratio);
-                        canvas.height = Math.round(bitmap.height * ratio);
+                        var ratio = Math.min(maxSize / img.naturalWidth, maxSize / img.naturalHeight);
+                        var canvas = document.createElement('canvas');
+                        canvas.width = Math.round(img.naturalWidth * ratio);
+                        canvas.height = Math.round(img.naturalHeight * ratio);
 
-                        const ctx = canvas.getContext('2d');
+                        var ctx = canvas.getContext('2d');
                         ctx.fillStyle = '#ffffff';
                         ctx.fillRect(0, 0, canvas.width, canvas.height);
-                        ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-                        bitmap.close();
+                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-                        return await new Promise(resolve => {
-                            canvas.toBlob(blob => resolve(blob), 'image/jpeg', 0.82);
+                        URL.revokeObjectURL(objectUrl);
+                        img.src = '';
+
+                        return await new Promise(function(resolve) {
+                            canvas.toBlob(function(blob) { resolve(blob); }, 'image/jpeg', 0.82);
                         });
                     } catch {
                         return null; // Fallback: servidor gera com GD

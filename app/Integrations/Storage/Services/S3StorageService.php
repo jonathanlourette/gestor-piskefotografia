@@ -26,20 +26,56 @@ class S3StorageService extends StorageService
      */
     public function upload(string $path, mixed $fileContent, string $contentType = 'image/jpeg'): string
     {
-        try {
-            $options = [
-                'ContentType' => $contentType,
-                'visibility' => 'private',
-            ];
+        $options = [
+            'ContentType' => $contentType,
+            'visibility' => 'private',
+        ];
 
-            if (! Storage::disk('s3')->put($path, $fileContent, $options)) {
-                throw new StorageException('Não foi possível realizar o upload do arquivo. Tente novamente.');
+        $contentSize = is_string($fileContent) ? strlen($fileContent) : 0;
+        $maxRetries = 3;
+        $lastError = null;
+
+        for ($attempt = 1; $attempt <= $maxRetries; $attempt++) {
+            try {
+                $start = microtime(true);
+                $result = Storage::disk('s3')->put($path, $fileContent, $options);
+                $elapsed = round(microtime(true) - $start, 2);
+
+                if ($result) {
+                    logger()->debug('S3 upload success', [
+                        'path' => $path,
+                        'size_kb' => round($contentSize / 1024),
+                        'attempt' => $attempt,
+                        'elapsed_s' => $elapsed,
+                    ]);
+
+                    return $path;
+                }
+
+                $lastError = new StorageException('S3 put returned false.');
+                logger()->warning('S3 put returned false', [
+                    'path' => $path,
+                    'size_kb' => round($contentSize / 1024),
+                    'attempt' => $attempt,
+                    'elapsed_s' => $elapsed,
+                ]);
+            } catch (Throwable $e) {
+                $lastError = $e;
+                logger()->error('S3 upload attempt failed', [
+                    'path' => $path,
+                    'size_kb' => round($contentSize / 1024),
+                    'attempt' => $attempt,
+                    'error' => $e->getMessage(),
+                    'class' => $e::class,
+                ]);
             }
 
-            return $path;
-        } catch (Throwable $e) {
-            throw new StorageException('Não foi possível realizar o upload do arquivo. Tente novamente.', 0, $e);
+            if ($attempt < $maxRetries) {
+                usleep(500000 * $attempt);
+            }
         }
+
+        throw new StorageException('Não foi possível realizar o upload do arquivo. Tente novamente.', 0, $lastError);
     }
 
     /**
