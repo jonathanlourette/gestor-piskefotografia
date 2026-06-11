@@ -305,6 +305,48 @@
                 },
 
                 /**
+                 * Redimensiona a foto original no navegador antes do upload.
+                 * Fotos de 12MP+ (~5-15MB) são convertidas para JPEG 85% com
+                 * no máximo 3000px, resultando em ~1-3MB. Evita erro 413 em
+                 * produção onde o nginx tem client_max_body_size limitado.
+                 */
+                async resizeForUpload(file) {
+                    if (file.type === 'image/png') {
+                        // PNGs não redimensionamos (pode ter transparência)
+                        return file;
+                    }
+
+                    try {
+                        const bitmap = await createImageBitmap(file);
+                        var maxDim = 4000;
+
+                        if (bitmap.width <= maxDim && bitmap.height <= maxDim && file.size <= 4 * 1024 * 1024) {
+                            bitmap.close();
+                            return file; // Já é pequena o suficiente
+                        }
+
+                        var ratio = Math.min(maxDim / bitmap.width, maxDim / bitmap.height, 1);
+                        var canvas = document.createElement('canvas');
+                        canvas.width = Math.round(bitmap.width * ratio);
+                        canvas.height = Math.round(bitmap.height * ratio);
+
+                        var ctx = canvas.getContext('2d');
+                        ctx.fillStyle = '#ffffff';
+                        ctx.fillRect(0, 0, canvas.width, canvas.height);
+                        ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+                        bitmap.close();
+
+                        var blob = await new Promise(function(resolve) {
+                            canvas.toBlob(function(b) { resolve(b); }, 'image/jpeg', 0.85);
+                        });
+
+                        return new File([blob], file.name.replace(/\.\w+$/, '.jpg'), { type: 'image/jpeg' });
+                    } catch {
+                        return file; // Fallback: envia original
+                    }
+                },
+
+                /**
                  * Gera a miniatura (600px, JPEG) no navegador, fora da thread principal.
                  * Evita o GD no servidor single-thread, que segurava a requisição
                  * seguinte e deixava todo o fluxo síncrono.
@@ -398,12 +440,16 @@
                 async uploadFile(item, entry, file) {
                     const formData = new FormData();
                     formData.append('order_item_id', item.id);
-                    formData.append('photo', file);
 
-                    const thumbnail = await this.makeThumbnail(file);
+                    // Redimensiona a foto original no frontend para evitar 413
+                    const optimizedFile = await this.resizeForUpload(file);
+                    formData.append('photo', optimizedFile);
+
+                    const thumbnail = await this.makeThumbnail(optimizedFile);
                     if (thumbnail) {
                         formData.append('thumbnail', thumbnail, 'thumb.jpg');
                     }
+                    // Se não gerou thumbnail, o backend usará a original como fallback
 
                     const xhr = new XMLHttpRequest();
 
