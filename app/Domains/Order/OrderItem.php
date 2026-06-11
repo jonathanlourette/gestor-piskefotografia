@@ -100,4 +100,14 @@ class OrderItem extends Model
 
         return $this->photos->count();
     }
+
+    /**
+     * Retorna o limite total de fotos do item (limite do produto × quantidade).
+     */
+    public function photoLimit(): int
+    {
+        $this->loadMissing('product');
+
+        return (int) $this->product->photo_limit * $this->quantity;
+    }
 }

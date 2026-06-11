@@ -1,5 +1,24 @@
 @php
     /** @var \App\Domains\Order\Order $order */
+
+    $productCounts = $order->items->countBy('product_id');
+    $productPosition = [];
+    $itemsPayload = $order->items->map(function ($item) use ($productCounts, &$productPosition) {
+        $productPosition[$item->product_id] = ($productPosition[$item->product_id] ?? 0) + 1;
+
+        $name = $item->product->name;
+        if ($productCounts[$item->product_id] > 1) {
+            $name .= ' · Pacote '.$productPosition[$item->product_id].' de '.$productCounts[$item->product_id];
+        }
+
+        return [
+            'id' => $item->id,
+            'name' => $name,
+            'photo_limit' => $item->photoLimit(),
+            'uploaded_count' => $item->photos->count(),
+            'photos' => $item->photos->map(fn ($p) => ['id' => $p->id, 'original_name' => $p->original_name, 'url' => $p->thumbnail_url]),
+        ];
+    });
 @endphp
 
 @extends('site::layouts.site')
@@ -10,13 +29,7 @@
 @section('content')
     <div x-data="orderUpload({
         orderId: {{ $order->id }},
-        items: {{ $order->items->map(fn($item) => [
-            'id' => $item->id,
-            'name' => $item->product->name,
-            'photo_limit' => $item->product->photo_limit,
-            'uploaded_count' => $item->photos->count(),
-            'photos' => $item->photos->map(fn($p) => ['id' => $p->id, 'original_name' => $p->original_name, 'url' => $p->temporary_url])
-        ])->toJson() }}
+        items: {{ $itemsPayload->toJson() }}
     })" class="container-fluid px-4 px-lg-5 py-5">
         <div class="col-lg-8 mx-auto">
             <!-- Page Header -->
@@ -29,11 +42,11 @@
             <div class="bg-white rounded-4 border border-secondary-subtle p-4 mb-5 shadow-sm">
                 <div class="d-flex justify-content-between align-items-center mb-2">
                     <span class="fw-semibold text-dark fs-5">Progresso Geral</span>
-                    <span class="text-body-secondary fs-5" x-text="`${totalUploaded} de ${totalRequired} fotos`"></span>
+                    <span class="text-body-secondary fs-5" x-text="totalUploaded + ' de ' + totalRequired + ' fotos'"></span>
                 </div>
                 <div class="progress bg-body-tertiary rounded-pill" style="height: 12px;">
                     <div class="progress-bar rounded-pill transition-all" role="progressbar"
-                         :style="`width: ${progressPercent}%; background: linear-gradient(135deg, #1a1a2e 0%, #0f0f23 100%);`"
+                         :style="'width: ' + progressPercent + '%; background: linear-gradient(135deg, #1a1a2e 0%, #0f0f23 100%);'"
                          :aria-valuenow="progressPercent" aria-valuemin="0" aria-valuemax="100"></div>
                 </div>
             </div>
@@ -45,7 +58,7 @@
                     <div class="px-4 pt-4 pb-3 d-flex justify-content-between align-items-center">
                         <div>
                             <h5 class="fw-bold text-dark mb-1 fs-4" x-text="item.name"></h5>
-                            <span class="text-body-secondary fs-5" x-text="`${item.uploaded_count} de ${item.photo_limit} fotos enviadas`"></span>
+                             <span class="text-body-secondary fs-5" x-text="item.uploaded_count + ' de ' + item.photo_limit + ' fotos enviadas'"></span>
                         </div>
                         <template x-if="item.uploaded_count >= item.photo_limit">
                             <span class="badge bg-success-subtle text-success-emphasis border border-success-subtle rounded-pill px-3 py-2 fw-medium">
@@ -61,20 +74,20 @@
                             <div class="rounded-4 text-center py-5 px-3 border-dashed position-relative transition-all"
                                  style="border-style: dashed !important; border-width: 2px; cursor: pointer;"
                                  :class="item.dragover ? 'border-dark bg-body-tertiary' : 'border-secondary-subtle'"
-                                 @dragover.prevent="item.dragover = true"
-                                 @dragleave.prevent="item.dragover = false"
-                                 @drop.prevent="handleDrop($event, item)"
-                                 @click="document.getElementById('file-input-' + item.id).click()">
+                                 x-on:dragover.prevent="item.dragover = true"
+                                 x-on:dragleave.prevent="item.dragover = false"
+                                 x-on:drop.prevent="handleDrop($event, item)"
+                                 x-on:click="document.getElementById('file-input-' + item.id).click()">
                                 <input type="file"
                                        :id="'file-input-' + item.id"
                                        accept="image/jpeg,image/png"
                                        multiple
                                        class="d-none"
-                                       @change="handleFileSelect($event, item)">
+                                       x-on:change="handleFileSelect($event, item)">
                                 <div class="bg-body-tertiary rounded-circle d-inline-flex align-items-center justify-content-center mb-3" style="width: 80px; height: 80px;">
                                     <i class="bi bi-cloud-upload fs-2 text-secondary"></i>
                                 </div>
-                                <p class="text-body-secondary mb-0 fs-5">Arraste fotos aqui ou <span class="text-decoration-underline fw-semibold text-dark">clique para selecionar</span></p>
+                                 <p class="text-body-secondary mb-0 fs-5" x-text="'Selecione até ' + (item.photo_limit - item.uploaded_count - item.queue.length) + ' foto(s)'"></p>
                                 <p class="text-body-secondary small mt-2 mb-0">JPG ou PNG · Máximo 15MB cada</p>
                             </div>
                         </div>
@@ -88,13 +101,13 @@
                                 <template x-for="photo in item.photos" :key="'photo-' + photo.id">
                                     <div class="position-relative" style="width: 96px;">
                                         <div class="rounded-3 overflow-hidden border border-secondary-subtle bg-body-tertiary" style="width: 96px; height: 96px;">
-                                            <img :src="photo.url" :alt="photo.original_name" class="w-100 h-100" style="object-fit: cover;" loading="lazy">
+                                            <img :src="photo.url" :alt="photo.original_name" class="w-100 h-100" style="object-fit: cover;" loading="lazy" decoding="async">
                                         </div>
                                         <button type="button"
                                                 class="btn btn-danger rounded-circle position-absolute d-flex align-items-center justify-content-center p-0 shadow"
                                                 style="width: 28px; height: 28px; top: -9px; right: -9px;"
                                                 :disabled="photo.removing"
-                                                @click="removePhoto(item, photo)"
+                                                x-on:click="removePhoto(item, photo)"
                                                 aria-label="Remover foto">
                                             <span class="spinner-border spinner-border-sm" x-show="photo.removing" style="display: none; width: 13px; height: 13px;"></span>
                                             <i class="bi bi-trash3-fill" x-show="!photo.removing" style="font-size: 0.78rem;"></i>
@@ -110,7 +123,8 @@
                                              :class="entry.status === 'error' ? 'border-danger' : 'border-secondary-subtle'"
                                              style="width: 96px; height: 96px;">
                                             <img :src="entry.previewUrl" :alt="entry.file.name" class="w-100 h-100" style="object-fit: cover;"
-                                                 x-show="entry.status !== 'error'"
+                                                 decoding="async"
+                                                 x-show="entry.previewUrl && entry.status !== 'error'"
                                                  x-on:error="$el.style.visibility = 'hidden'">
                                             <template x-if="entry.status === 'pending'">
                                                 <div class="position-absolute top-0 start-0 w-100 h-100 d-flex flex-column align-items-center justify-content-center gap-1" style="background: rgba(255, 255, 255, 0.65);">
@@ -120,11 +134,18 @@
                                             </template>
                                             <template x-if="entry.status === 'uploading'">
                                                 <div class="position-absolute top-0 start-0 w-100 h-100 d-flex flex-column align-items-center justify-content-center gap-1" style="background: rgba(15, 15, 35, 0.55);">
-                                                    <span class="spinner-border spinner-border-sm text-white" x-show="entry.progress >= 100"></span>
-                                                    <span class="text-white fw-bold small" x-show="entry.progress < 100" x-text="`${entry.progress}%`"></span>
+                                                     <span class="text-white fw-bold small" x-text="entry.progress + '%'"></span>
+                                                     <div class="progress rounded-pill" style="height: 5px; width: 70%; background: rgba(255, 255, 255, 0.3);">
+                                                         <div class="progress-bar bg-white rounded-pill"
+                                                              :style="'width: ' + entry.progress + '%'"></div>
+                                                     </div>
+                                                </div>
+                                            </template>
+                                            <template x-if="entry.status === 'processing'">
+                                                <div class="position-absolute top-0 start-0 w-100 h-100 d-flex flex-column align-items-center justify-content-center gap-1" style="background: rgba(15, 15, 35, 0.65);">
+                                                    <span class="text-white fw-medium" style="font-size: 0.65rem;">Processando...</span>
                                                     <div class="progress rounded-pill" style="height: 5px; width: 70%; background: rgba(255, 255, 255, 0.3);">
-                                                        <div class="progress-bar progress-bar-striped progress-bar-animated bg-white rounded-pill"
-                                                             :style="`width: ${entry.progress}%; transition: width 0.2s ease;`"></div>
+                                                        <div class="progress-bar progress-bar-striped progress-bar-animated bg-white rounded-pill" style="width: 100%;"></div>
                                                     </div>
                                                 </div>
                                             </template>
@@ -138,7 +159,7 @@
                                             <button type="button"
                                                     class="btn btn-danger rounded-circle position-absolute d-flex align-items-center justify-content-center p-0 shadow"
                                                     style="width: 28px; height: 28px; top: -9px; right: -9px;"
-                                                    @click="removeQueueEntry(item, entry)"
+                                                    x-on:click="removeQueueEntry(item, entry)"
                                                     aria-label="Descartar">
                                                 <i class="bi bi-x-lg" style="font-size: 0.78rem;"></i>
                                             </button>
@@ -189,7 +210,7 @@
                 })),
                 pendingJobs: [],
                 activeUploads: 0,
-                maxConcurrentUploads: 2,
+                maxConcurrentUploads: 1,
 
                 get totalUploaded() {
                     return this.items.reduce((sum, item) => sum + item.uploaded_count, 0);
@@ -221,30 +242,100 @@
                 },
 
                 processFiles(files, item) {
-                    const remaining = item.photo_limit - item.uploaded_count;
-                    const toUpload = files.slice(0, remaining);
+                    const remaining = item.photo_limit - item.uploaded_count - item.queue.length;
+
+                    if (remaining <= 0) {
+                        window.dispatchEvent(new CustomEvent('toast', {
+                            detail: { type: 'error', message: 'Todas as vagas deste pacote já foram preenchidas.' }
+                        }));
+                        return;
+                    }
 
                     if (files.length > remaining) {
                         window.dispatchEvent(new CustomEvent('toast', {
-                            detail: { type: 'warning', message: `Limite de ${item.photo_limit} fotos: apenas ${remaining} foto(s) serão enviadas.` }
+                            detail: { type: 'error', message: 'Você selecionou ' + files.length + ' fotos, mas só restam ' + remaining + ' vaga(s). Apenas as primeiras ' + remaining + ' fotos serão enviadas.' }
                         }));
                     }
 
+                    var toUpload = files.slice(0, remaining);
                     toUpload.forEach(file => {
                         const entry = {
                             id: Date.now() + Math.random(),
                             file: file,
-                            previewUrl: URL.createObjectURL(file),
+                            previewUrl: '',
                             status: 'pending',
                             progress: 0,
                             errorMessage: '',
                         };
                         item.queue.push(entry);
                         // Entry reativa para a UI atualizar; File cru para o FormData (proxy quebra o envio)
-                        this.pendingJobs.push({ item, entry: item.queue[item.queue.length - 1], file });
+                        const reactiveEntry = item.queue[item.queue.length - 1];
+                        this.makePreview(file).then(url => { reactiveEntry.previewUrl = url; });
+                        this.pendingJobs.push({ item, entry: reactiveEntry, file });
                     });
 
                     this.pumpUploadQueue();
+                },
+
+                /**
+                 * Gera um preview minúsculo (192px) fora da thread principal.
+                 * Usar o arquivo original direto força o navegador a decodificar a
+                 * imagem inteira (vários megapixels) para um tile de 96px, travando
+                 * as animações das barras de progresso.
+                 */
+                async makePreview(file) {
+                    try {
+                        const bitmap = await createImageBitmap(file, { resizeWidth: 192, resizeQuality: 'low' });
+                        const canvas = document.createElement('canvas');
+                        canvas.width = bitmap.width;
+                        canvas.height = bitmap.height;
+                        canvas.getContext('2d').drawImage(bitmap, 0, 0);
+                        bitmap.close();
+
+                        return await new Promise(resolve => {
+                            canvas.toBlob(
+                                blob => resolve(blob ? URL.createObjectURL(blob) : URL.createObjectURL(file)),
+                                'image/jpeg',
+                                0.7
+                            );
+                        });
+                    } catch {
+                        return URL.createObjectURL(file);
+                    }
+                },
+
+                /**
+                 * Gera a miniatura (600px, JPEG) no navegador, fora da thread principal.
+                 * Evita o GD no servidor single-thread, que segurava a requisição
+                 * seguinte e deixava todo o fluxo síncrono.
+                 */
+                async makeThumbnail(file) {
+                    try {
+                        const bitmap = await createImageBitmap(file);
+                        const maxSize = 600;
+
+                        if (bitmap.width <= maxSize && bitmap.height <= maxSize) {
+                            bitmap.close();
+                            return null; // Servidor usa a própria foto como miniatura
+                        }
+
+                        const ratio = Math.min(maxSize / bitmap.width, maxSize / bitmap.height);
+                        const canvas = document.createElement('canvas');
+                        canvas.width = Math.round(bitmap.width * ratio);
+                        canvas.height = Math.round(bitmap.height * ratio);
+
+                        const ctx = canvas.getContext('2d');
+                        ctx.fillStyle = '#ffffff';
+                        ctx.fillRect(0, 0, canvas.width, canvas.height);
+                        ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+                        bitmap.close();
+
+                        return await new Promise(resolve => {
+                            canvas.toBlob(blob => resolve(blob), 'image/jpeg', 0.82);
+                        });
+                    } catch {
+                        return null; // Fallback: servidor gera com GD
+                    }
                 },
 
                 pumpUploadQueue() {
@@ -257,8 +348,11 @@
                 },
 
                 removeQueueEntry(item, entry) {
-                    item.queue = item.queue.filter(e => e.id !== entry.id);
-                    setTimeout(() => URL.revokeObjectURL(entry.previewUrl), 1000);
+                    const index = item.queue.findIndex(e => e.id === entry.id);
+                    if (index !== -1) {
+                        item.queue.splice(index, 1);
+                    }
+                    setTimeout(() => { if (entry.previewUrl) URL.revokeObjectURL(entry.previewUrl); }, 1000);
                 },
 
                 async removePhoto(item, photo) {
@@ -301,17 +395,31 @@
                     }
                 },
 
-                uploadFile(item, entry, file) {
+                async uploadFile(item, entry, file) {
                     const formData = new FormData();
                     formData.append('order_item_id', item.id);
                     formData.append('photo', file);
+
+                    const thumbnail = await this.makeThumbnail(file);
+                    if (thumbnail) {
+                        formData.append('thumbnail', thumbnail, 'thumb.jpg');
+                    }
 
                     const xhr = new XMLHttpRequest();
 
                     xhr.upload.addEventListener('progress', (e) => {
                         if (e.lengthComputable) {
-                            entry.progress = Math.round((e.loaded / e.total) * 100);
+                            const percent = Math.round((e.loaded / e.total) * 100);
+                            // Só atualiza o estado reativo quando o % inteiro muda (evita re-renders excessivos)
+                            if (percent !== entry.progress) {
+                                entry.progress = percent;
+                            }
                         }
+                    });
+
+                    // Bytes enviados: agora o servidor converte a miniatura e salva
+                    xhr.upload.addEventListener('load', () => {
+                        entry.status = 'processing';
                     });
 
                     xhr.addEventListener('load', () => {
@@ -339,13 +447,13 @@
                                 entry.errorMessage = 'Resposta inválida do servidor.';
                             }
                         } else {
-                            entry.status = 'error';
-                            try {
-                                const response = JSON.parse(xhr.responseText);
-                                entry.errorMessage = response.message || `Erro ${xhr.status}`;
-                            } catch {
-                                entry.errorMessage = `Erro ${xhr.status}`;
-                            }
+                             entry.status = 'error';
+                             try {
+                                 const response = JSON.parse(xhr.responseText);
+                                 entry.errorMessage = response.message || ('Erro ' + xhr.status);
+                             } catch {
+                                 entry.errorMessage = 'Erro ' + xhr.status;
+                             }
                         }
                     });
 

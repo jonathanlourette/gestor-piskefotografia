@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Apps\Admin\Controllers;
 
+use App\Domains\Order\Actions\DeleteOrderAction;
 use App\Domains\Order\Actions\RetrieveOrderAction;
 use App\Domains\Order\Actions\RetrieveOrdersAction;
 use App\Domains\Order\Actions\UpdateOrderNotesAction;
@@ -11,6 +12,7 @@ use App\Domains\Order\Actions\UpdateOrderStatusAction;
 use App\Domains\Order\Enums\OrderStatusEnum;
 use App\Domains\Order\Order;
 use App\Integrations\Storage\Contract\StorageServiceInterface;
+use App\Support\Exceptions\BusinessException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -105,6 +107,22 @@ class OrderController extends BaseAdminController
 
             return back()->with('success', 'Notas internas atualizadas com sucesso!');
         } catch (\Exception $e) {
+            return back()->with('warning', $e->getMessage());
+        }
+    }
+
+    /**
+     * Exclui um pedido e todas as suas fotos do S3.
+     */
+    public function delete(int $id, DeleteOrderAction $action): RedirectResponse
+    {
+        try {
+            $action->setData(['id' => $id])->perform();
+
+            return redirect()
+                ->route('admin.orders.index')
+                ->with('success', 'Pedido excluído com sucesso!');
+        } catch (BusinessException $e) {
             return back()->with('warning', $e->getMessage());
         }
     }

@@ -118,17 +118,21 @@ class OrderController extends BaseSiteController
             $request->validate([
                 'order_item_id' => ['required', 'integer'],
                 'photo' => ['required', 'file', 'mimes:jpg,jpeg,png', 'max:15360'],
+                'thumbnail' => ['nullable', 'file', 'mimes:jpg,jpeg', 'max:2048'],
             ], [
                 'order_item_id.required' => 'O item do pedido é obrigatório.',
                 'photo.required' => 'A foto é obrigatória.',
                 'photo.mimes' => 'A foto deve ser JPG ou PNG.',
                 'photo.max' => 'A foto não pode ter mais de 15MB.',
+                'thumbnail.mimes' => 'A miniatura deve ser JPG.',
+                'thumbnail.max' => 'A miniatura não pode ter mais de 2MB.',
             ]);
 
             $photo = $action->setData([
                 'order_id' => $id,
                 'order_item_id' => $request->input('order_item_id'),
                 'file' => $request->file('photo'),
+                'thumbnail' => $request->file('thumbnail'),
             ])->perform();
 
             return response()->json([
@@ -138,7 +142,7 @@ class OrderController extends BaseSiteController
                     'id' => $photo->id,
                     's3_path' => $photo->s3_path,
                     'original_name' => $photo->original_name,
-                    'url' => $photo->temporary_url,
+                    'url' => $photo->thumbnail_url,
                 ],
             ]);
 
@@ -219,7 +223,7 @@ class OrderController extends BaseSiteController
             $order = $action->setData(['id' => $id])->perform();
 
             $incompleteItems = $order->items->filter(function ($item) {
-                return $item->photos->count() < $item->product->photo_limit;
+                return $item->photos->count() < $item->photoLimit();
             });
 
             if ($incompleteItems->isNotEmpty()) {

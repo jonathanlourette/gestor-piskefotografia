@@ -55,12 +55,12 @@
                          @foreach($products as $product)
                              <tr class="border-bottom border-light" style="transition: background-color 0.2s ease;">
                                  <td class="ps-4 py-4">
-                                     <div class="d-flex align-items-center gap-3">
-                                         @if($product->image_path)
-                                             <img src="{{ asset($product->image_path) }}" alt="{{ $product->name }}" class="rounded-3" style="width: 48px; height: 48px; object-fit: cover;" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-                                             <div class="bg-primary-subtle text-primary-emphasis rounded-4 d-flex justify-content-center align-items-center" style="width: 48px; height: 48px; display: none;">
-                                                 <i class="bi bi-box-seam fs-5"></i>
-                                             </div>
+                                      <div class="d-flex align-items-center gap-3">
+                                          @if($product->image_url)
+                                              <img src="{{ $product->image_url }}" alt="{{ $product->name }}" class="rounded-3" style="width: 48px; height: 48px; object-fit: cover;" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                                              <div class="bg-primary-subtle text-primary-emphasis rounded-4 d-flex justify-content-center align-items-center" style="width: 48px; height: 48px; display: none;">
+                                                  <i class="bi bi-box-seam fs-5"></i>
+                                              </div>
                                          @else
                                              <div class="bg-primary-subtle text-primary-emphasis rounded-4 d-flex justify-content-center align-items-center" style="width: 48px; height: 48px;">
                                                  <i class="bi bi-box-seam fs-5"></i>

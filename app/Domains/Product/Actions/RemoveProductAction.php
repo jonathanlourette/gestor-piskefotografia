@@ -8,6 +8,7 @@ use App\Domains\Product\Product;
 use App\Support\Action;
 use App\Support\Exceptions\BusinessException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Facades\Storage;
 
 final class RemoveProductAction extends Action
 {
@@ -21,6 +22,11 @@ final class RemoveProductAction extends Action
         try {
             /** @var Product $product */
             $product = Product::findOrFail($this->data->get('id'));
+
+            // Delete the image file if it exists
+            if ($product->image_path && Storage::disk('public')->exists($product->image_path)) {
+                Storage::disk('public')->delete($product->image_path);
+            }
 
             $product->delete();
 

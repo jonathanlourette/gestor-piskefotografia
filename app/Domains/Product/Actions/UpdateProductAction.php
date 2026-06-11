@@ -11,7 +11,7 @@ use App\Support\Exceptions\BusinessException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 final class UpdateProductAction extends Action
@@ -103,8 +103,8 @@ final class UpdateProductAction extends Action
      */
     private function deleteExistingImage(Product $product): void
     {
-        if ($product->image_path && File::exists(public_path($product->image_path))) {
-            File::delete(public_path($product->image_path));
+        if ($product->image_path && Storage::disk('public')->exists($product->image_path)) {
+            Storage::disk('public')->delete($product->image_path);
         }
     }
 
@@ -123,20 +123,16 @@ final class UpdateProductAction extends Action
             throw new BusinessException('Extensão de arquivo inválida.');
         }
 
-        $directory = public_path('assets/img/products');
-
-        if (! File::exists($directory)) {
-            File::makeDirectory($directory, 0755, true);
-        }
-
         $filename = Str::slug(pathinfo($image->getClientOriginalName(), PATHINFO_FILENAME))
             .'-'
             .Str::random(6)
             .'.'
             .$image->getClientOriginalExtension();
 
-        $image->move($directory, $filename);
+        $path = 'products/'.$filename;
 
-        return 'assets/img/products/'.$filename;
+        Storage::disk('public')->put($path, file_get_contents($image->getRealPath()));
+
+        return $path;
     }
 }

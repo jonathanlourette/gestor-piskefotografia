@@ -29,6 +29,9 @@
     .position-transparent.navbar-light .nav-link:hover {
         color: #ffffff !important;
     }
+    .navbar-hidden {
+        transform: translateY(-110%);
+    }
     .floating-cart-btn {
         top: 0.75rem;
         right: 1.5rem;
@@ -56,8 +59,7 @@
         style="z-index: 10; top: 0; transition: all 0.3s ease;"
         x-data="{ scrolled: window.scrollY > 50, hideAtTop: {{ $headerSolid ? 'true' : 'false' }} }"
         x-init="window.addEventListener('scroll', () => { scrolled = window.scrollY > 50; })"
-        :class="scrolled ? 'bg-white shadow-sm' : 'bg-transparent'"
-        :style="hideAtTop && !scrolled ? 'transform: translateY(-110%);' : ''"
+        :class="(scrolled ? 'bg-white shadow-sm' : 'bg-transparent') + (hideAtTop && !scrolled ? ' navbar-hidden' : '')"
     >
         <div class="container-fluid px-4 px-lg-5">
             <a class="navbar-brand fw-bold" href="{{ route('site.landing.index') }}">

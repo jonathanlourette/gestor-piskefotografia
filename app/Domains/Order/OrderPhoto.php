@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $id
  * @property int $order_item_id
  * @property string $s3_path
+ * @property string|null $thumbnail_path
  * @property string $original_name
  * @property int|null $size_bytes
  * @property Carbon|null $created_at
@@ -68,5 +69,13 @@ class OrderPhoto extends Model
     public function getTemporaryUrlAttribute(): string
     {
         return app(StorageServiceInterface::class)->getUrl($this->s3_path);
+    }
+
+    /**
+     * Retorna a URL temporária assinada da miniatura no S3 (fallback para a original).
+     */
+    public function getThumbnailUrlAttribute(): string
+    {
+        return app(StorageServiceInterface::class)->getUrl($this->thumbnail_path ?: $this->s3_path);
     }
 }

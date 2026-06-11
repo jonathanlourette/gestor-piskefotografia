@@ -9,7 +9,7 @@ use App\Domains\Product\Product;
 use App\Support\Action;
 use App\Support\Exceptions\BusinessException;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 final class CreateProductAction extends Action
@@ -82,20 +82,16 @@ final class CreateProductAction extends Action
             throw new BusinessException('Extensão de arquivo inválida.');
         }
 
-        $directory = public_path('assets/img/products');
-
-        if (! File::exists($directory)) {
-            File::makeDirectory($directory, 0755, true);
-        }
-
         $filename = Str::slug(pathinfo($image->getClientOriginalName(), PATHINFO_FILENAME))
             .'-'
             .Str::random(6)
             .'.'
             .$image->getClientOriginalExtension();
 
-        $image->move($directory, $filename);
+        $path = 'products/'.$filename;
 
-        return 'assets/img/products/'.$filename;
+        Storage::disk('public')->put($path, file_get_contents($image->getRealPath()));
+
+        return $path;
     }
 }

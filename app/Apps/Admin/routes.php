@@ -39,6 +39,7 @@ Route::middleware(['web', 'admin'])->prefix('admin')->name('admin.')->group(func
     Route::controller(OrderController::class)->prefix('pedidos')->name('orders.')->group(function () {
         Route::get('/', 'index')->name('index');
         Route::get('/{id}', 'show')->name('show');
+        Route::delete('/{id}', 'delete')->name('delete');
         Route::put('/{id}/status', 'updateStatus')->name('updateStatus');
         Route::get('/{id}/fotos', 'photos')->name('photos');
         Route::put('/{id}/notas', 'updateNotes')->name('updateNotes');

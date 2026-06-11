@@ -8,6 +8,7 @@ use App\Domains\Product\Enums\ProductTypeEnum;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * @property int $id
@@ -18,6 +19,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property int $photo_limit
  * @property ProductTypeEnum $type
  * @property string|null $image_path
+ * @property string|null $image_url
  * @property bool $active
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
@@ -78,5 +80,17 @@ class Product extends Model
     public function isActive(): bool
     {
         return $this->active;
+    }
+
+    /**
+     * Get the URL for the product cover image.
+     */
+    public function getImageUrlAttribute(): ?string
+    {
+        if (! $this->image_path) {
+            return null;
+        }
+
+        return Storage::disk('public')->url($this->image_path);
     }
 }

@@ -40,12 +40,17 @@ final class CreateOrderAction extends Action
                         throw new BusinessException('Produto não encontrado ou indisponível.');
                     }
 
-                    $item = new OrderItem;
-                    $item->order_id = $order->id;
-                    $item->product_id = $product->id;
-                    $item->quantity = (int) ($itemData['quantity'] ?? 1);
-                    $item->unit_price = $product->price;
-                    $item->save();
+                    $quantity = max(1, (int) ($itemData['quantity'] ?? 1));
+
+                    // Cada unidade do pacote vira um item separado, com upload de fotos próprio
+                    for ($i = 0; $i < $quantity; $i++) {
+                        $item = new OrderItem;
+                        $item->order_id = $order->id;
+                        $item->product_id = $product->id;
+                        $item->quantity = 1;
+                        $item->unit_price = $product->price;
+                        $item->save();
+                    }
                 }
 
                 $order->load('items');

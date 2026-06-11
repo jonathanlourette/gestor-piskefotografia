@@ -9,6 +9,7 @@ use App\Domains\Order\OrderPhoto;
 use App\Integrations\Storage\Contract\StorageServiceInterface;
 use App\Support\Action;
 use App\Support\Exceptions\BusinessException;
+use App\Support\ThumbnailGenerator;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -42,7 +43,7 @@ final class UploadOrderPhotoAction extends Action
 
                 $currentPhotosCount = $orderItem->photos()->count();
 
-                if ($currentPhotosCount >= $orderItem->product->photo_limit) {
+                if ($currentPhotosCount >= $orderItem->photoLimit()) {
                     throw new BusinessException('O limite de fotos para este item foi atingido.');
                 }
 
@@ -57,6 +58,7 @@ final class UploadOrderPhotoAction extends Action
                 $randomSuffix = Str::random(8);
                 $safeFilename = "{$slugName}-{$randomSuffix}.{$extension}";
                 $s3Path = "orders/{$order->id}/{$orderItem->id}/{$safeFilename}";
+                $thumbnailPath = "orders/{$order->id}/{$orderItem->id}/thumbs/{$safeFilename}";
 
                 $s3Path = $this->storageService->upload(
                     $s3Path,
@@ -64,9 +66,32 @@ final class UploadOrderPhotoAction extends Action
                     $file->getMimeType(),
                 );
 
+                /** @var UploadedFile|null $clientThumbnail */
+                $clientThumbnail = $this->data->get('thumbnail');
+
+                if ($clientThumbnail instanceof UploadedFile) {
+                    // Miniatura gerada no navegador: evita o custo do GD no servidor
+                    $thumbnailPath = "orders/{$order->id}/{$orderItem->id}/thumbs/{$slugName}-{$randomSuffix}.jpg";
+                    $thumbnailPath = $this->storageService->upload(
+                        $thumbnailPath,
+                        file_get_contents($clientThumbnail->getRealPath()),
+                        'image/jpeg',
+                    );
+                } else {
+                    $thumbnailContent = ThumbnailGenerator::generate($file->getRealPath(), $extension);
+
+                    if ($thumbnailContent !== null) {
+                        $thumbnailPath = $this->storageService->upload($thumbnailPath, $thumbnailContent, $file->getMimeType());
+                    } else {
+                        // Imagem pequena ou falha do GD: usa a original como miniatura
+                        $thumbnailPath = $s3Path;
+                    }
+                }
+
                 $photo = new OrderPhoto;
                 $photo->order_item_id = $orderItem->id;
                 $photo->s3_path = $s3Path;
+                $photo->thumbnail_path = $thumbnailPath;
                 $photo->original_name = $originalName;
                 $photo->size_bytes = $file->getSize();
                 $photo->save();
@@ -87,6 +112,7 @@ final class UploadOrderPhotoAction extends Action
             'order_id' => ['required', 'integer'],
             'order_item_id' => ['required', 'integer'],
             'file' => ['required', 'file', 'mimes:jpg,jpeg,png', 'max:15360'],
+            'thumbnail' => ['nullable', 'file', 'mimes:jpg,jpeg', 'max:2048'],
         ], [
             'order_id.required' => 'O ID do pedido é obrigatório.',
             'order_item_id.required' => 'O ID do item é obrigatório.',

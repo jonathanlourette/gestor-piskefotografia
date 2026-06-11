@@ -21,7 +21,7 @@
         <button type="button" class="btn-close btn-close-white fs-4 opacity-75-hover" data-bs-dismiss="offcanvas" aria-label="Fechar"></button>
     </div>
 
-    <div class="offcanvas-body p-4">
+    <div class="offcanvas-body p-4 d-flex flex-column overflow-hidden">
         <!-- Empty State -->
         <div x-show="cartData.items.length === 0" class="text-center py-5 my-4">
             <div class="py-5">
@@ -39,84 +39,84 @@
         </div>
 
         <!-- Carrinho com itens -->
-        <div x-show="cartData.items.length > 0">
-            <!-- Lista de itens -->
-            <div class="d-flex flex-column gap-3 mb-4">
-                <template x-for="item in cartData.items" :key="item.product_id">
-                    <div class="bg-body-tertiary rounded-4 p-4 border border-light">
-                        <div class="d-flex justify-content-between align-items-start gap-3">
-                            <div class="flex-grow-1">
-                                <h6 class="fw-bold text-dark mb-2" x-text="item.name"></h6>
-                                <div class="d-flex flex-wrap gap-3 mb-3">
-                                    <div class="text-secondary small">
-                                        <i class="bi bi-images me-1"></i>
-                                        <span x-text="item.photo_limit + ' foto(s)'"></span>
+        <div x-show="cartData.items.length > 0" class="d-flex flex-column flex-grow-1 overflow-hidden">
+            <!-- Lista de itens (scrollável) -->
+            <div class="flex-grow-1 overflow-auto" style="-webkit-overflow-scrolling: touch;">
+                <div class="d-flex flex-column gap-3 pb-3">
+                    <template x-for="item in cartData.items" :key="item.product_id">
+                        <div class="bg-body-tertiary rounded-4 p-4 border border-light">
+                            <div class="d-flex justify-content-between align-items-start gap-3">
+                                <div class="flex-grow-1">
+                                    <h6 class="fw-bold text-dark mb-2" x-text="item.name"></h6>
+                                    <div class="d-flex flex-wrap gap-3 mb-3">
+                                        <div class="text-secondary small">
+                                            <i class="bi bi-images me-1"></i>
+                                            <span x-text="item.photo_limit + ' foto(s)'"></span>
+                                        </div>
+                                        <div class="text-secondary small">
+                                            <i class="bi bi-currency-dollar me-1"></i>
+                                            <span x-text="formatPrice(item.price)"></span>
+                                        </div>
                                     </div>
-                                    <div class="text-secondary small">
-                                        <i class="bi bi-currency-dollar me-1"></i>
-                                        <span x-text="formatPrice(item.price)"></span>
+                                    <div class="d-flex align-items-center gap-3">
+                                        <span class="text-secondary small">Quantidade:</span>
+                                        <span class="badge bg-dark rounded-pill px-3 py-2 fw-medium" x-text="item.quantity"></span>
                                     </div>
                                 </div>
-                                <div class="d-flex align-items-center gap-3">
-                                    <span class="text-secondary small">Quantidade:</span>
-                                    <span class="badge bg-dark rounded-pill px-3 py-2 fw-medium" x-text="item.quantity"></span>
+                                <div class="text-end">
+                                    <div class="fw-bold text-dark fs-5 mb-3" x-text="formatPrice(item.price * item.quantity)"></div>
+                                    <button
+                                        type="button"
+                                        class="btn btn-sm btn-light bg-white text-danger border-0 rounded-3 px-3 py-2"
+                                        x-on:click="removeItem(item.product_id)"
+                                        :disabled="isRemoving"
+                                    >
+                                        <i class="bi bi-trash3-fill" x-show="!isRemoving"></i>
+                                        <span class="spinner-border spinner-border-sm" x-show="isRemoving" style="display: none;"></span>
+                                    </button>
                                 </div>
-                            </div>
-                            <div class="text-end">
-                                <div class="fw-bold text-dark fs-5 mb-3" x-text="formatPrice(item.price * item.quantity)"></div>
-                                <button
-                                    type="button"
-                                    class="btn btn-sm btn-light bg-white text-danger border-0 rounded-3 px-3 py-2"
-                                    @click="removeItem(item.product_id)"
-                                    :disabled="isRemoving"
-                                >
-                                    <i class="bi bi-trash3-fill" x-show="!isRemoving"></i>
-                                    <span class="spinner-border spinner-border-sm" x-show="isRemoving" style="display: none;"></span>
-                                </button>
                             </div>
                         </div>
-                    </div>
-                </template>
+                    </template>
+                </div>
             </div>
 
-            <!-- Botão limpar carrinho -->
-            <div class="d-flex justify-content-end mb-4">
+            <!-- Footer fixo: resumo + finalizar -->
+            <div class="border-top border-light pt-3 mt-2 bg-white" style="flex-shrink: 0;">
+                <!-- Resumo e Total -->
+                <div class="d-flex justify-content-between align-items-center mb-3 px-1">
+                    <div>
+                        <span class="fw-semibold text-dark">Total</span>
+                    </div>
+                    <div class="text-end">
+                        <span class="fw-bold text-dark fs-5" x-text="formatPrice(cartData.total)"></span>
+                    </div>
+                </div>
+
+                <!-- Botão limpar carrinho -->
                 <button
                     type="button"
-                    class="btn btn-light bg-body-tertiary text-secondary border-0 rounded-4 px-4 py-2 fw-medium small"
-                    @click="clearCart()"
+                    class="btn btn-light bg-body w-100 rounded-4 px-4 fw-medium small text-secondary mb-2"
+                    x-on:click="clearCart()"
                     :disabled="isClearing"
                 >
-                    <i class="bi bi-trash3 me-2" x-show="!isClearing"></i>
+                    <i class="bi bi-trash3 me-1" x-show="!isClearing"></i>
                     <span x-show="!isClearing">Limpar Carrinho</span>
                     <span x-show="isClearing" style="display: none;">
                         Limpando... <span class="spinner-border spinner-border-sm align-middle"></span>
                     </span>
                 </button>
-            </div>
 
-            <!-- Resumo e Total -->
-            <div class="bg-white rounded-4 p-4 border border-light shadow-sm mb-4">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <h6 class="fw-bold text-dark mb-1">Total</h6>
-                        <p class="text-secondary small mb-0">Subtotal de todos os itens</p>
-                    </div>
-                    <div class="text-end">
-                        <div class="fw-bold text-dark fs-3" x-text="formatPrice(cartData.total)"></div>
-                    </div>
-                </div>
+                <!-- Botão Finalizar -->
+                <a
+                    href="{{ route('site.order.create') }}"
+                    class="btn btn-dark btn-lg w-100 rounded-4 px-4 fw-semibold shadow-sm d-flex align-items-center justify-content-center gap-2"
+                    onclick="const oc = bootstrap.Offcanvas.getInstance(document.getElementById('cartOffcanvas')); if(oc) oc.hide();"
+                >
+                    <i class="bi bi-check-circle fs-5"></i>
+                    Finalizar Pedido
+                </a>
             </div>
-
-            <!-- Botão Finalizar -->
-            <a
-                href="{{ route('site.order.create') }}"
-                class="btn btn-dark btn-lg w-100 rounded-4 px-4 fw-semibold shadow-sm d-flex align-items-center justify-content-center gap-2"
-                onclick="const oc = bootstrap.Offcanvas.getInstance(document.getElementById('cartOffcanvas')); if(oc) oc.hide();"
-            >
-                <i class="bi bi-check-circle fs-5"></i>
-                Finalizar Pedido
-            </a>
         </div>
     </div>
 </div>

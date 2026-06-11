@@ -33,6 +33,9 @@ final class RemoveOrderPhotoAction extends Action
                     throw new BusinessException('A foto não pertence ao pedido informado.');
                 }
 
+                if ($photo->thumbnail_path && $photo->thumbnail_path !== $photo->s3_path) {
+                    $this->storageService->delete($photo->thumbnail_path);
+                }
                 $this->storageService->delete($photo->s3_path);
 
                 $photo->delete();

@@ -155,11 +155,11 @@
 
                     <!-- Imagem de Capa -->
                     <div class="col-12">
-                        <div x-data="{
-                            hasImage: {{ $product && $product->image_path ? 'true' : 'false' }},
-                            removeImage: false,
-                            previewUrl: {{ $product && $product->image_path ? "'" . asset($product->image_path) . "'" : 'null' }}
-                        }">
+                         <div x-data="{
+                             hasImage: {{ $product && $product->image_path ? 'true' : 'false' }},
+                             removeImage: false,
+                             previewUrl: {{ $product && $product->image_url ? "'" . $product->image_url . "'" : 'null' }}
+                         }">
                             <label class="form-label fw-semibold text-dark fs-6 mb-2">
                                 Imagem de Capa
                             </label>

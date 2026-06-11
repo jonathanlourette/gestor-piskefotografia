@@ -7,6 +7,8 @@ namespace Database\Seeders;
 use App\Domains\Product\Enums\ProductTypeEnum;
 use App\Domains\Product\Product;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Storage;
 
 class ProductSeeder extends Seeder
 {
@@ -15,6 +17,8 @@ class ProductSeeder extends Seeder
      */
     public function run(): void
     {
+        $this->ensureProductImages();
+
         $products = [
             [
                 'name' => '20 Fotos',
@@ -46,7 +50,7 @@ class ProductSeeder extends Seeder
                 'price' => 15.00,
                 'photo_limit' => 1,
                 'type' => ProductTypeEnum::IMA->value,
-                'image_path' => 'assets/img/prod_extra_4.jpg',
+                'image_path' => 'products/polaroid-ima.jpg',
                 'active' => true,
             ],
             [
@@ -55,7 +59,7 @@ class ProductSeeder extends Seeder
                 'price' => 15.00,
                 'photo_limit' => 1,
                 'type' => ProductTypeEnum::QUADRO->value,
-                'image_path' => 'assets/img/prod_extra_1.jpg',
+                'image_path' => 'products/quadro.jpg',
                 'active' => true,
             ],
             [
@@ -64,7 +68,7 @@ class ProductSeeder extends Seeder
                 'price' => 15.00,
                 'photo_limit' => 20,
                 'type' => ProductTypeEnum::ALBUM->value,
-                'image_path' => 'assets/img/prod_extra_2.jpg',
+                'image_path' => 'products/album.jpg',
                 'active' => true,
             ],
         ];
@@ -74,6 +78,30 @@ class ProductSeeder extends Seeder
                 ['slug' => $product['slug']],
                 $product
             );
+        }
+    }
+
+    /**
+     * Copy seed images to storage/app/public/products/ if they don't exist.
+     * Source images live in resources/assets/seed/products/.
+     */
+    private function ensureProductImages(): void
+    {
+        $sourceDir = resource_path('assets/seed/products');
+
+        if (! File::isDirectory($sourceDir)) {
+            $this->command->warn('Diretório de imagens seed não encontrado: '.$sourceDir);
+
+            return;
+        }
+
+        foreach (File::files($sourceDir) as $file) {
+            $path = 'products/'.$file->getFilename();
+
+            if (! Storage::disk('public')->exists($path)) {
+                Storage::disk('public')->put($path, file_get_contents($file->getPathname()));
+                $this->command->info('Imagem copiada: '.$file->getFilename());
+            }
         }
     }
 }

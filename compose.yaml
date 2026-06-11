@@ -78,6 +78,19 @@ services:
             - '${FORWARD_MAILPIT_DASHBOARD_PORT:-8025}:8025'
         networks:
             - sail
+    createbuckets:
+        image: 'minio/mc:latest'
+        depends_on:
+            minio:
+                condition: service_healthy
+        networks:
+            - sail
+        entrypoint: >
+            /bin/sh -c "
+            /usr/bin/mc alias set local http://minio:9000 sail password;
+            /usr/bin/mc mb --ignore-existing local/${AWS_BUCKET:-s3-private};
+            exit 0;
+            "
 networks:
     sail:
         driver: bridge

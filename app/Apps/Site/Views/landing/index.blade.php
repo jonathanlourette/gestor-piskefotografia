@@ -216,9 +216,9 @@
                         @foreach($outros as $produto)
                             <div class="col-md-4">
                                 <div class="card h-100 border border-secondary-subtle bg-white rounded-4 p-0 text-center product-card-hover overflow-hidden">
-                                    @if($produto->image_path)
-                                        <div class="position-relative overflow-hidden">
-                                            <img src="{{ asset($produto->image_path) }}" alt="{{ $produto->name }}" class="card-img-top transition-all" style="object-fit: cover; height: 200px;">
+                                     @if($produto->image_url)
+                                         <div class="position-relative overflow-hidden">
+                                             <img src="{{ $produto->image_url }}" alt="{{ $produto->name }}" class="card-img-top transition-all" style="object-fit: cover; height: 200px;">
                                         </div>
                                     @else
                                         <div class="py-4">

@@ -254,6 +254,46 @@
         </template>
     </div>
 
+    <!-- Confirm Modal -->
+    <div class="modal fade" id="confirmModal" tabindex="-1" aria-labelledby="confirmModalMessage" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content rounded-4 border-0 shadow-lg">
+                <div class="modal-body p-4">
+                    <p class="fw-semibold text-dark mb-0" id="confirmModalMessage"></p>
+                </div>
+                <div class="modal-footer border-0 pt-0 px-4 pb-4 gap-2">
+                    <button type="button" class="btn btn-light rounded-4 fw-medium flex-grow-1" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-danger rounded-4 fw-medium flex-grow-1" id="confirmModalOk">Confirmar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        window.confirmModal = function (message) {
+            return new Promise((resolve) => {
+                const modalEl = document.getElementById('confirmModal');
+                const okBtn = document.getElementById('confirmModalOk');
+
+                document.getElementById('confirmModalMessage').textContent = message;
+
+                const modal = new bootstrap.Modal(modalEl, { backdrop: 'static' });
+
+                const onOk = () => { cleanup(); modal.hide(); resolve(true); };
+                const onCancel = () => { cleanup(); modal.hide(); resolve(false); };
+                const cleanup = () => {
+                    okBtn.removeEventListener('click', onOk);
+                    modalEl.removeEventListener('hidden.bs.modal', onCancel);
+                };
+
+                okBtn.addEventListener('click', onOk);
+                modalEl.addEventListener('hidden.bs.modal', onCancel, { once: true });
+
+                modal.show();
+            });
+        };
+    </script>
+
     @stack('scripts')
 </body>
 </html>
