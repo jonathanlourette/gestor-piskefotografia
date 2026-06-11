@@ -122,7 +122,7 @@
                                         <div class="rounded-3 overflow-hidden border position-relative bg-body-tertiary"
                                              :class="entry.status === 'error' ? 'border-danger' : 'border-secondary-subtle'"
                                              style="width: 96px; height: 96px;">
-                                            <img :src="entry.previewUrl" :alt="entry.file.name" class="w-100 h-100" style="object-fit: cover;"
+                                                <img :src="entry.previewUrl" :alt="entry.fileName" class="w-100 h-100" style="object-fit: cover;"
                                                  decoding="async"
                                                  x-show="entry.previewUrl && entry.status !== 'error'"
                                                  x-on:error="$el.style.visibility = 'hidden'">
