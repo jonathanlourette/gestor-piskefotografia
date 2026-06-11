@@ -290,7 +290,7 @@
                         item.queue.push(entry);
                         const reactiveEntry = item.queue[item.queue.length - 1];
                         this.makePreview(file).then(url => { reactiveEntry.previewUrl = url; });
-                        this.pendingJobs.push({ item, entry: reactiveEntry, file });
+                        this.pendingJobs.push({ item, entryId });
                     });
 
                     this.pumpUploadQueue();
@@ -402,9 +402,19 @@
                 pumpUploadQueue() {
                     while (this.activeUploads < this.maxConcurrentUploads && this.pendingJobs.length > 0) {
                         const job = this.pendingJobs.shift();
+                        var entry = null;
+                        for (var i = 0; i < job.item.queue.length; i++) {
+                            if (job.item.queue[i].id === job.entryId) {
+                                entry = job.item.queue[i];
+                                break;
+                            }
+                        }
+                        if (!entry) { continue; }
+                        var rawFile = rawFiles.get(job.entryId);
+                        if (!rawFile) { continue; }
                         this.activeUploads++;
-                        job.entry.status = 'uploading';
-                        this.uploadFile(job.item, job.entry, job.file);
+                        entry.status = 'uploading';
+                        this.uploadFile(job.item, entry, rawFile);
                     }
                 },
 
@@ -418,12 +428,11 @@
                 },
 
                 retryUpload(item, entry) {
-                    var rawFile = rawFiles.get(entry.id);
-                    if (!rawFile) return;
+                    if (!rawFiles.has(entry.id)) return;
                     entry.status = 'pending';
                     entry.progress = 0;
                     entry.errorMessage = '';
-                    this.pendingJobs.push({ item: item, entry: entry, file: rawFile });
+                    this.pendingJobs.push({ item: item, entryId: entry.id });
                     this.pumpUploadQueue();
                 },
 
