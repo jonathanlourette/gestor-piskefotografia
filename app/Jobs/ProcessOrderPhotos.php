@@ -39,9 +39,9 @@ class ProcessOrderPhotos implements ShouldQueue
             return;
         }
 
-        // Get all photos that still need processing (have original_s3_path set)
+        // Get all photos that still need processing (have original_s3_path set and are on local disk)
         $photos = $order->items->flatMap->photos->filter(
-            fn (OrderPhoto $photo) => $photo->original_s3_path !== null,
+            fn (OrderPhoto $photo) => $photo->original_s3_path !== null && $photo->storage_disk === 'local',
         );
 
         if ($photos->isEmpty()) {
@@ -94,20 +94,26 @@ class ProcessOrderPhotos implements ShouldQueue
 
     private function processPhoto(OrderPhoto $photo, StorageServiceInterface $storageService): void
     {
+        // Idempotency guard: if already migrated to S3, skip
+        if ($photo->storage_disk === 's3') {
+            Log::info('ProcessOrderPhotos: photo already on S3, skipping', ['photo_id' => $photo->id]);
+
+            return;
+        }
+
         $tempFile = sys_get_temp_dir().'/process_'.Str::random(16).'.jpg';
 
         try {
-            // 1. Read original from S3
-            $originalContent = Storage::disk('s3')->get($photo->original_s3_path);
-
-            if ($originalContent === null) {
-                Log::error('ProcessOrderPhotos: original file not found in S3', [
+            // 1. Read original from local public disk
+            if (! Storage::disk('public')->exists($photo->original_s3_path)) {
+                Log::error('ProcessOrderPhotos: original file not found on local disk', [
                     'photo_id' => $photo->id,
                     'original_s3_path' => $photo->original_s3_path,
                 ]);
 
                 return;
             }
+            $originalContent = Storage::disk('public')->get($photo->original_s3_path);
 
             // 2. Write to temp file
             file_put_contents($tempFile, $originalContent);
@@ -187,18 +193,41 @@ class ProcessOrderPhotos implements ShouldQueue
                 return;
             }
 
-            // 8. Upload processed: derive path by removing "originals/" from path
+            // 8. Upload processed image to S3
             $processedPath = str_replace('/originals/', '/', $photo->original_s3_path);
             $processedPath = $storageService->upload($processedPath, $processedContent, 'image/jpeg');
 
-            // 9. Delete original from S3
-            Storage::disk('s3')->delete($photo->original_s3_path);
+            // 9. Upload thumbnail to S3 (currently only on local disk)
+            $s3ThumbnailPath = $photo->thumbnail_path;
+            if ($photo->thumbnail_path !== null && $photo->thumbnail_path !== $photo->original_s3_path) {
+                $thumbnailContent = Storage::disk('public')->get($photo->thumbnail_path);
+                if ($thumbnailContent !== null) {
+                    $s3ThumbnailPath = $storageService->upload(
+                        $photo->thumbnail_path,
+                        $thumbnailContent,
+                        'image/jpeg',
+                    );
+                }
+            }
 
-            // 10. Update photo record
-            $photo->s3_path = $processedPath;
-            $photo->original_s3_path = null;
-            $photo->size_bytes = strlen($processedContent);
-            $photo->save();
+            // 10. Capture local paths BEFORE clearing them
+            $localPaths = array_filter([
+                $photo->original_s3_path,
+                $photo->thumbnail_path !== $photo->original_s3_path ? $photo->thumbnail_path : null,
+            ]);
+
+            // 11. Update DB first (within transaction) — if save fails, local files survive for retry
+            DB::transaction(function () use ($photo, $processedPath, $s3ThumbnailPath, $processedContent): void {
+                $photo->s3_path = $processedPath;
+                $photo->original_s3_path = null;
+                $photo->thumbnail_path = $s3ThumbnailPath;
+                $photo->storage_disk = 's3';
+                $photo->size_bytes = strlen($processedContent);
+                $photo->save();
+            });
+
+            // 12. Delete local files AFTER successful DB commit
+            Storage::disk('public')->delete($localPaths);
         } catch (\Throwable $e) {
             Log::error('ProcessOrderPhotos: failed to process photo', [
                 'photo_id' => $photo->id,

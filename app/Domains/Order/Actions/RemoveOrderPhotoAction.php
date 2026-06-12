@@ -10,6 +10,7 @@ use App\Support\Action;
 use App\Support\Exceptions\BusinessException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 final class RemoveOrderPhotoAction extends Action
 {
@@ -33,10 +34,20 @@ final class RemoveOrderPhotoAction extends Action
                     throw new BusinessException('A foto não pertence ao pedido informado.');
                 }
 
-                if ($photo->thumbnail_path && $photo->thumbnail_path !== $photo->s3_path) {
-                    $this->storageService->delete($photo->thumbnail_path);
+                // Delete files from the correct disk
+                if ($photo->storage_disk === 'local') {
+                    $paths = array_filter([
+                        $photo->s3_path,
+                        $photo->thumbnail_path !== $photo->s3_path ? $photo->thumbnail_path : null,
+                        $photo->original_s3_path,
+                    ]);
+                    Storage::disk('public')->delete($paths);
+                } else {
+                    if ($photo->thumbnail_path && $photo->thumbnail_path !== $photo->s3_path) {
+                        $this->storageService->delete($photo->thumbnail_path);
+                    }
+                    $this->storageService->delete($photo->s3_path);
                 }
-                $this->storageService->delete($photo->s3_path);
 
                 $photo->delete();
 

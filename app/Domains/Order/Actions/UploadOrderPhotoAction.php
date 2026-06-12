@@ -6,19 +6,15 @@ namespace App\Domains\Order\Actions;
 
 use App\Domains\Order\OrderItem;
 use App\Domains\Order\OrderPhoto;
-use App\Integrations\Storage\Contract\StorageServiceInterface;
 use App\Support\Action;
 use App\Support\Exceptions\BusinessException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 final class UploadOrderPhotoAction extends Action
 {
-    public function __construct(
-        private readonly StorageServiceInterface $storageService,
-    ) {}
-
     /**
      * @throws BusinessException
      */
@@ -53,36 +49,29 @@ final class UploadOrderPhotoAction extends Action
                 $randomSuffix = Str::random(8);
                 $safeFilename = "{$slugName}-{$randomSuffix}.jpg";
 
-                // 1. Upload original file directly to S3 — no processing
-                $originalS3Path = "orders/{$order->id}/{$orderItem->id}/originals/{$safeFilename}";
+                // 1. Save original to public disk — instant, no network
+                $originalPath = "orders/{$order->id}/{$orderItem->id}/originals/{$safeFilename}";
                 $originalContent = file_get_contents($file->getRealPath());
-                $originalS3Path = $this->storageService->upload(
-                    $originalS3Path,
-                    $originalContent,
-                    $mimeType,
-                );
+                Storage::disk('public')->put($originalPath, $originalContent);
 
-                // 2. Upload thumbnail from frontend (no GD processing on server)
+                // 2. Save thumbnail to public disk (from frontend — no GD processing on server)
                 $thumbnailPath = "orders/{$order->id}/{$orderItem->id}/thumbs/{$safeFilename}";
                 /** @var UploadedFile|null $thumbnailFile */
                 $thumbnailFile = $this->data->get('thumbnail');
 
                 if ($thumbnailFile !== null) {
                     $thumbnailContent = file_get_contents($thumbnailFile->getRealPath());
-                    $thumbnailPath = $this->storageService->upload(
-                        $thumbnailPath,
-                        $thumbnailContent,
-                        'image/jpeg',
-                    );
+                    Storage::disk('public')->put($thumbnailPath, $thumbnailContent);
                 } else {
-                    $thumbnailPath = $originalS3Path;
+                    $thumbnailPath = $originalPath;
                 }
 
-                // 3. Create OrderPhoto
+                // 3. Create OrderPhoto with local disk reference
                 $photo = new OrderPhoto;
                 $photo->order_item_id = $orderItem->id;
-                $photo->s3_path = $thumbnailPath;
-                $photo->original_s3_path = $originalS3Path;
+                $photo->storage_disk = 'local';
+                $photo->s3_path = $originalPath;
+                $photo->original_s3_path = $originalPath;
                 $photo->thumbnail_path = $thumbnailPath;
                 $photo->original_name = $originalName;
                 $photo->size_bytes = $file->getSize();
