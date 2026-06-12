@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $id
  * @property int $order_item_id
  * @property string $s3_path
+ * @property string|null $original_s3_path
  * @property string|null $thumbnail_path
  * @property string $original_name
  * @property int|null $size_bytes

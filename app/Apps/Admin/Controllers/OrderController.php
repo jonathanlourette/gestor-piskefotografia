@@ -46,6 +46,13 @@ class OrderController extends BaseAdminController
         /** @var Order $order */
         $order = $action->setData(['id' => $id])->perform();
 
+        // Show processing screen for orders awaiting photo upload or processing
+        if (in_array($order->status, [OrderStatusEnum::ENVIADO, OrderStatusEnum::PROCESSANDO], true)) {
+            return view('admin::orders.processing', [
+                'order' => $order,
+            ]);
+        }
+
         $order->items->each(function ($item) use ($storageService) {
             $item->photos->each(function ($photo) use ($storageService) {
                 $photo->temporary_url = $storageService->getUrl($photo->s3_path);
@@ -54,7 +61,7 @@ class OrderController extends BaseAdminController
 
         return view('admin::orders.show', [
             'order' => $order,
-            'statusOptions' => OrderStatusEnum::options(),
+            'statusOptions' => OrderStatusEnum::adminOptions(),
         ]);
     }
 

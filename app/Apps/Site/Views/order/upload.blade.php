@@ -184,22 +184,25 @@
             </template>
 
             <!-- Finalize Button -->
-            <form action="{{ route('site.order.finalize', $order->id) }}" method="POST">
-                @csrf
-                <div class="d-flex flex-column flex-md-row gap-3 mt-2 mb-5">
-                    <button
-                        type="submit"
-                        class="btn btn-lg rounded-4 fw-semibold px-5 flex-grow-1"
-                        :class="allComplete ? 'btn-dark' : 'btn-outline-dark'"
-                        :disabled="!allComplete"
-                    >
+            <div class="d-flex flex-column flex-md-row gap-3 mt-2 mb-5">
+                <button
+                    type="button"
+                    class="btn btn-lg rounded-4 fw-semibold px-5 flex-grow-1"
+                    :class="allComplete ? 'btn-dark' : 'btn-outline-dark'"
+                    :disabled="finalizing || !allComplete"
+                    x-on:click="finalizeOrder()"
+                >
+                    <span x-show="!finalizing">
                         <i class="bi bi-check2-all me-2"></i>Finalizar Envio
-                    </button>
-                    <a href="{{ route('site.landing.index') }}" class="btn btn-light btn-lg rounded-4 fw-semibold text-secondary">
-                        Voltar à Página Inicial
-                    </a>
-                </div>
-            </form>
+                    </span>
+                    <span x-show="finalizing" style="display: none;">
+                        <span class="spinner-border spinner-border-sm me-2"></span>Finalizando...
+                    </span>
+                </button>
+                <a href="{{ route('site.landing.index') }}" class="btn btn-light btn-lg rounded-4 fw-semibold text-secondary">
+                    Voltar à Página Inicial
+                </a>
+            </div>
         </div>
     </div>
 @endsection
@@ -222,6 +225,7 @@
                 pendingJobs: [],
                 activeUploads: 0,
                 maxConcurrentUploads: 1,
+                finalizing: false,
 
                 get totalUploaded() {
                     return this.items.reduce((sum, item) => sum + item.uploaded_count, 0);
@@ -445,6 +449,35 @@
                     xhr.setRequestHeader('X-CSRF-TOKEN', document.querySelector('meta[name="csrf-token"]').content);
                     xhr.setRequestHeader('Accept', 'application/json');
                     xhr.send(formData);
+                },
+
+                async finalizeOrder() {
+                    if (this.finalizing || !this.allComplete) return;
+                    this.finalizing = true;
+                    try {
+                        const response = await fetch('{{ route("site.order.finalize", $order->id) }}', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/json',
+                                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                            },
+                        });
+                        const data = await response.json();
+                        if (data.success && data.redirect) {
+                            window.location.href = data.redirect;
+                        } else {
+                            this.finalizing = false;
+                            window.dispatchEvent(new CustomEvent('toast', {
+                                detail: { type: 'error', message: data.message || 'Erro ao finalizar pedido.' }
+                            }));
+                        }
+                    } catch {
+                        this.finalizing = false;
+                        window.dispatchEvent(new CustomEvent('toast', {
+                            detail: { type: 'error', message: 'Erro de conexão. Tente novamente.' }
+                        }));
+                    }
                 },
             };
         }

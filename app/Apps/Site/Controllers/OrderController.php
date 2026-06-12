@@ -8,6 +8,8 @@ use App\Domains\Order\Actions\CreateOrderAction;
 use App\Domains\Order\Actions\RemoveOrderPhotoAction;
 use App\Domains\Order\Actions\RetrieveOrderAction;
 use App\Domains\Order\Actions\UploadOrderPhotoAction;
+use App\Domains\Order\Enums\OrderStatusEnum;
+use App\Jobs\ProcessOrderPhotos;
 use App\Support\Exceptions\BusinessException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -213,9 +215,22 @@ class OrderController extends BaseSiteController
     /**
      * Finaliza o envio de fotos do pedido.
      */
-    public function finalize(int $id, RetrieveOrderAction $action): RedirectResponse
+    public function finalize(int $id, RetrieveOrderAction $action): JsonResponse|RedirectResponse
     {
         try {
+            $pendingOrderId = session('pending_order_id');
+
+            if ((int) $pendingOrderId !== $id) {
+                if (request()->wantsJson()) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Acesso não autorizado.',
+                    ], 403);
+                }
+
+                abort(403, 'Acesso não autorizado.');
+            }
+
             $order = $action->setData(['id' => $id])->perform();
 
             $incompleteItems = $order->items->filter(function ($item) {
@@ -224,17 +239,53 @@ class OrderController extends BaseSiteController
 
             if ($incompleteItems->isNotEmpty()) {
                 $names = $incompleteItems->map(fn ($item) => $item->product->name)->join(', ');
+                $message = "Envie todas as fotos antes de finalizar. Faltam fotos em: {$names}";
 
-                return back()->with('warning', "Envie todas as fotos antes de finalizar. Faltam fotos em: {$names}");
+                if (request()->wantsJson()) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => $message,
+                    ], 422);
+                }
+
+                return back()->with('warning', $message);
+            }
+
+            // Update order status to PROCESSANDO (async processing begins)
+            $order->status = OrderStatusEnum::PROCESSANDO;
+            $order->save();
+
+            // Dispatch single job to process ALL photos in this order
+            ProcessOrderPhotos::dispatch($order->id);
+
+            if (request()->wantsJson()) {
+                return response()->json([
+                    'success' => true,
+                    'redirect' => route('site.tracking.show', $order->uuid),
+                ]);
             }
 
             return redirect()
-                ->route('site.order.confirmation', ['id' => $id]);
+                ->route('site.tracking.show', $order->uuid);
 
         } catch (BusinessException $e) {
+            if (request()->wantsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $e->getMessage(),
+                ], 422);
+            }
+
             return back()->with('error', $e->getMessage());
         } catch (\Throwable $e) {
             report($e);
+
+            if (request()->wantsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Não foi possível finalizar o pedido. Tente novamente.',
+                ], 500);
+            }
 
             return back()->with('error', 'Não foi possível finalizar o pedido. Tente novamente.');
         }

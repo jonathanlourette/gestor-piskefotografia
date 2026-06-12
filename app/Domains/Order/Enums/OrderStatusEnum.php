@@ -10,6 +10,8 @@ enum OrderStatusEnum: int
     case PAGO = 2;
     case REVELANDO = 3;
     case CONCLUIDO = 4;
+    case PROCESSANDO = 5;
+    case PROCESSADO = 6;
 
     /**
      * Retorna o rótulo em português do status.
@@ -21,6 +23,8 @@ enum OrderStatusEnum: int
             self::PAGO => 'Pago',
             self::REVELANDO => 'Revelando',
             self::CONCLUIDO => 'Concluído',
+            self::PROCESSANDO => 'Processando',
+            self::PROCESSADO => 'Processado',
         };
     }
 
@@ -34,6 +38,8 @@ enum OrderStatusEnum: int
             self::PAGO => 'primary',
             self::REVELANDO => 'info',
             self::CONCLUIDO => 'success',
+            self::PROCESSANDO => 'secondary',
+            self::PROCESSADO => 'success',
         };
     }
 
@@ -46,7 +52,9 @@ enum OrderStatusEnum: int
             self::ENVIADO => 'bi-inbox',
             self::PAGO => 'bi-check-circle',
             self::REVELANDO => 'bi-camera',
-            self::CONCLUIDO => 'trophy',
+            self::CONCLUIDO => 'bi-trophy',
+            self::PROCESSANDO => 'bi-gear',
+            self::PROCESSADO => 'bi-check2-all',
         };
     }
 
@@ -60,11 +68,13 @@ enum OrderStatusEnum: int
             self::PAGO => 'Pagamento confirmado! Seu pedido será iniciado em breve.',
             self::REVELANDO => 'Suas fotos estão sendo reveladas com qualidade profissional.',
             self::CONCLUIDO => 'Suas fotos estão prontas! Entre em contato para combinar a entrega.',
+            self::PROCESSANDO => 'As fotos estão sendo processadas. Aguarde a conclusão.',
+            self::PROCESSADO => 'Todas as fotos foram processadas com sucesso.',
         };
     }
 
     /**
-     * Retorna array de opções para selects HTML.
+     * Retorna array de opções para selects HTML (todos os statuses).
      *
      * @return array<int, string>
      */
@@ -72,6 +82,23 @@ enum OrderStatusEnum: int
     {
         return [
             self::ENVIADO->value => self::ENVIADO->label(),
+            self::PAGO->value => self::PAGO->label(),
+            self::REVELANDO->value => self::REVELANDO->label(),
+            self::CONCLUIDO->value => self::CONCLUIDO->label(),
+            self::PROCESSANDO->value => self::PROCESSANDO->label(),
+            self::PROCESSADO->value => self::PROCESSADO->label(),
+        ];
+    }
+
+    /**
+     * Retorna array de opções para o select de status do admin.
+     * O admin pode manualmente definir: Pago, Revelando ou Concluído.
+     *
+     * @return array<int, string>
+     */
+    public static function adminOptions(): array
+    {
+        return [
             self::PAGO->value => self::PAGO->label(),
             self::REVELANDO->value => self::REVELANDO->label(),
             self::CONCLUIDO->value => self::CONCLUIDO->label(),

@@ -27,15 +27,25 @@ final class UpdateOrderStatusAction extends Action
 
                 $newStatus = OrderStatusEnum::from((int) $this->data->get('status'));
 
-                $transitions = [
-                    OrderStatusEnum::ENVIADO->value => OrderStatusEnum::PAGO->value,
-                    OrderStatusEnum::PAGO->value => OrderStatusEnum::REVELANDO->value,
-                    OrderStatusEnum::REVELANDO->value => OrderStatusEnum::CONCLUIDO->value,
+                // ENVIADO/PROCESSANDO só pode ir para PAGO
+                // PAGO, REVELANDO, CONCLUIDO transitam livremente entre si
+                $restrictedStatuses = [
+                    OrderStatusEnum::ENVIADO->value,
+                    OrderStatusEnum::PROCESSANDO->value,
+                    OrderStatusEnum::PROCESSADO->value,
                 ];
 
-                $allowed = $transitions[$order->status->value] ?? null;
+                $freeStatuses = [
+                    OrderStatusEnum::PAGO->value,
+                    OrderStatusEnum::REVELANDO->value,
+                    OrderStatusEnum::CONCLUIDO->value,
+                ];
 
-                if ($allowed === null || $newStatus->value !== $allowed) {
+                if (in_array($order->status->value, $restrictedStatuses, true)) {
+                    if (! in_array($newStatus->value, $freeStatuses, true)) {
+                        throw new BusinessException("Não é possível alterar o status de \"{$order->status->label()}\" para \"{$newStatus->label()}\".");
+                    }
+                } elseif (! in_array($order->status->value, $freeStatuses, true)) {
                     throw new BusinessException("Não é possível alterar o status de \"{$order->status->label()}\" para \"{$newStatus->label()}\".");
                 }
 
