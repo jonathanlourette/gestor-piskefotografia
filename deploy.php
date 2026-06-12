@@ -123,6 +123,7 @@ before('deploy:symlink', 'artisan:migrate');
 
 after('deploy:success', function () {
     run('sudo systemctl restart apache2');
+    run('sudo systemctl restart fila-gestor-piskefotografia-prod');
 });
 
 if (!$isSandbox) {
