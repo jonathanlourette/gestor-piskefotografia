@@ -200,6 +200,13 @@
          <!-- Update Status -->
          <div class="bg-white rounded-4 p-4 border border-secondary-subtle shadow-sm mb-4">
              <h5 class="fw-bold text-dark mb-3">Atualizar Status</h5>
+             
+             <!-- Status atual como texto -->
+             <div class="mb-3 p-3 rounded-3 bg-{{ $order->status->color() }}-subtle border border-{{ $order->status->color() }}-subtle">
+                 <span class="small text-{{ $order->status->color() }}-emphasis fw-semibold text-uppercase d-block mb-1" style="font-size: 0.7rem;">Status Atual</span>
+                 <span class="fw-bold text-{{ $order->status->color() }}-emphasis fs-5">{{ $order->status->label() }}</span>
+             </div>
+
              <form action="{{ route('admin.orders.updateStatus', $order->id) }}" method="POST">
                  @csrf
                  @method('PUT')
@@ -209,10 +216,9 @@
                              style="transition: box-shadow 0.2s ease;"
                              onfocus="this.style.boxShadow='0 0 0 3px rgba(13, 110, 253, 0.15)'" 
                              onblur="this.style.boxShadow='none'">
+                         <option value="" disabled selected>Selecione o novo status...</option>
                          @foreach($statusOptions as $value => $label)
-                             <option value="{{ $value }}" {{ $order->status->value === $value ? 'selected' : '' }}>
-                                 {{ $label }}
-                             </option>
+                             <option value="{{ $value }}">{{ $label }}</option>
                          @endforeach
                      </select>
                  </div>

@@ -120,6 +120,7 @@ class OrderController extends BaseSiteController
             $request->validate([
                 'order_item_id' => ['required', 'integer'],
                 'photo' => ['required', 'file', 'mimes:jpg,jpeg,png,webp', 'max:20480'],
+                'thumbnail' => ['nullable', 'file', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
             ], [
                 'order_item_id.required' => 'O item do pedido é obrigatório.',
                 'photo.required' => 'A foto é obrigatória.',
@@ -131,6 +132,7 @@ class OrderController extends BaseSiteController
                 'order_id' => $id,
                 'order_item_id' => $request->input('order_item_id'),
                 'file' => $request->file('photo'),
+                'thumbnail' => $request->file('thumbnail'),
             ])->perform();
 
             return response()->json([

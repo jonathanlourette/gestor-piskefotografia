@@ -373,15 +373,29 @@
 
                 uploadFile(item, entry, file) {
                     var self = this;
-                    const formData = new FormData();
-                    formData.append('order_item_id', item.id);
-                    formData.append('photo', file);
+                    self.generateThumbnailBlob(file).then(function(thumbBlob) {
+                        var formData = new FormData();
+                        formData.append('order_item_id', item.id);
+                        formData.append('photo', file);
+                        if (thumbBlob) {
+                            formData.append('thumbnail', thumbBlob, 'thumb.jpg');
+                        }
+                        self.sendUploadXhr(item, entry, formData);
+                    }).catch(function() {
+                        var formData = new FormData();
+                        formData.append('order_item_id', item.id);
+                        formData.append('photo', file);
+                        self.sendUploadXhr(item, entry, formData);
+                    });
+                },
 
-                    const xhr = new XMLHttpRequest();
+                sendUploadXhr(item, entry, formData) {
+                    var self = this;
+                    var xhr = new XMLHttpRequest();
 
                     xhr.upload.addEventListener('progress', function(e) {
                         if (e.lengthComputable) {
-                            const percent = Math.round((e.loaded / e.total) * 100);
+                            var percent = Math.round((e.loaded / e.total) * 100);
                             if (percent !== entry.progress) {
                                 entry.progress = percent;
                             }
@@ -395,7 +409,7 @@
                     xhr.addEventListener('load', function() {
                         if (xhr.status >= 200 && xhr.status < 300) {
                             try {
-                                const response = JSON.parse(xhr.responseText);
+                                var response = JSON.parse(xhr.responseText);
                                 if (response.success) {
                                     entry.status = 'success';
                                     item.uploaded_count++;
@@ -417,21 +431,21 @@
                                 entry.errorMessage = 'Resposta inválida do servidor.';
                             }
                         } else {
-                             entry.status = 'error';
-                             try {
-                                 const response = JSON.parse(xhr.responseText);
-                                 var msg = response.message || ('Erro ' + xhr.status);
-                                 if (msg === 'validation.uploaded') {
-                                     msg = 'Falha no envio. Tente novamente.';
-                                 }
-                                 entry.errorMessage = msg;
-                             } catch {
-                                 if (xhr.status === 413) {
-                                     entry.errorMessage = 'Arquivo muito grande.';
-                                 } else {
-                                     entry.errorMessage = 'Erro ' + xhr.status;
-                                 }
-                             }
+                            entry.status = 'error';
+                            try {
+                                var response = JSON.parse(xhr.responseText);
+                                var msg = response.message || ('Erro ' + xhr.status);
+                                if (msg === 'validation.uploaded') {
+                                    msg = 'Falha no envio. Tente novamente.';
+                                }
+                                entry.errorMessage = msg;
+                            } catch {
+                                if (xhr.status === 413) {
+                                    entry.errorMessage = 'Arquivo muito grande.';
+                                } else {
+                                    entry.errorMessage = 'Erro ' + xhr.status;
+                                }
+                            }
                         }
                     });
 
@@ -449,6 +463,53 @@
                     xhr.setRequestHeader('X-CSRF-TOKEN', document.querySelector('meta[name="csrf-token"]').content);
                     xhr.setRequestHeader('Accept', 'application/json');
                     xhr.send(formData);
+                },
+
+                generateThumbnailBlob(file) {
+                    return new Promise(function(resolve) {
+                        if (!file.type.startsWith('image/')) {
+                            resolve(null);
+                            return;
+                        }
+
+                        var url = URL.createObjectURL(file);
+                        var img = new Image();
+                        img.onload = function() {
+                            URL.revokeObjectURL(url);
+                            var maxSize = 350;
+                            var origW = img.naturalWidth;
+                            var origH = img.naturalHeight;
+                            var newW = maxSize;
+                            var newH = maxSize;
+
+                            if (origW > maxSize || origH > maxSize) {
+                                if (origW > origH) {
+                                    newW = maxSize;
+                                    newH = Math.round((origH / origW) * maxSize);
+                                } else {
+                                    newH = maxSize;
+                                    newW = Math.round((origW / origH) * maxSize);
+                                }
+                            } else {
+                                newW = origW;
+                                newH = origH;
+                            }
+
+                            var canvas = document.createElement('canvas');
+                            canvas.width = newW;
+                            canvas.height = newH;
+                            var ctx = canvas.getContext('2d');
+                            ctx.drawImage(img, 0, 0, newW, newH);
+                            canvas.toBlob(function(blob) {
+                                resolve(blob);
+                            }, 'image/jpeg', 0.5);
+                        };
+                        img.onerror = function() {
+                            URL.revokeObjectURL(url);
+                            resolve(null);
+                        };
+                        img.src = url;
+                    });
                 },
 
                 async finalizeOrder() {
