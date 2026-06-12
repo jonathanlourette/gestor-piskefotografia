@@ -80,7 +80,7 @@
                                  x-on:click="document.getElementById('file-input-' + item.id).click()">
                                 <input type="file"
                                        :id="'file-input-' + item.id"
-                                       accept="image/jpeg,image/png"
+                                       accept="image/*"
                                        multiple
                                        class="d-none"
                                        x-on:change="handleFileSelect($event, item)">
@@ -88,19 +88,18 @@
                                     <i class="bi bi-cloud-upload fs-2 text-secondary"></i>
                                 </div>
                                  <p class="text-body-secondary mb-0 fs-5" x-text="'Selecione até ' + (item.photo_limit - item.uploaded_count - item.queue.length) + ' foto(s)'"></p>
-                                <p class="text-body-secondary small mt-2 mb-0">JPG ou PNG · Máximo 15MB cada</p>
+                                <p class="text-body-secondary small mt-2 mb-0">Qualquer formato · Máximo 20MB cada</p>
                             </div>
                         </div>
                     </template>
 
                     <!-- Miniaturas: fotos enviadas + uploads em andamento -->
-                    <template x-if="item.photos.length > 0 || item.queue.length > 0">
-                        <div class="px-4 pb-4">
-                            <div class="d-flex flex-wrap gap-3">
+                    <div x-show="item.photos.length > 0 || item.queue.length > 0" class="px-4 pb-4" style="display: none;">
+                            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 0.75rem;">
                                 <!-- Fotos já enviadas -->
                                 <template x-for="photo in item.photos" :key="'photo-' + photo.id">
-                                    <div class="position-relative" style="width: 96px;">
-                                        <div class="rounded-3 overflow-hidden border border-secondary-subtle bg-body-tertiary" style="width: 96px; height: 96px;">
+                                    <div class="position-relative">
+                                        <div class="rounded-3 overflow-hidden border border-secondary-subtle bg-body-tertiary" style="aspect-ratio: 1;">
                                             <img :src="photo.url" :alt="photo.original_name" class="w-100 h-100" style="object-fit: cover;" loading="lazy" decoding="async">
                                         </div>
                                         <button type="button"
@@ -118,22 +117,20 @@
 
                                 <!-- Uploads em andamento / com erro -->
                                 <template x-for="entry in item.queue" :key="'queue-' + entry.id">
-                                    <div class="position-relative" style="width: 96px;">
+                                    <div class="position-relative">
                                         <div class="rounded-3 overflow-hidden border position-relative bg-body-tertiary"
                                              :class="entry.status === 'error' ? 'border-danger' : 'border-secondary-subtle'"
-                                             style="width: 96px; height: 96px;">
-                                                <img :src="entry.previewUrl" :alt="entry.fileName" class="w-100 h-100" style="object-fit: cover;"
-                                                 decoding="async"
-                                                 x-show="entry.previewUrl && entry.status !== 'error'"
-                                                 x-on:error="$el.style.visibility = 'hidden'">
+                                             style="aspect-ratio: 1;">
                                             <template x-if="entry.status === 'pending'">
-                                                <div class="position-absolute top-0 start-0 w-100 h-100 d-flex flex-column align-items-center justify-content-center gap-1" style="background: rgba(255, 255, 255, 0.65);">
-                                                    <i class="bi bi-clock text-secondary fs-5"></i>
+                                                <div class="position-absolute top-0 start-0 w-100 h-100 d-flex flex-column align-items-center justify-content-center gap-1">
+                                                    <div class="spinner-border spinner-border-sm text-secondary" role="status" style="width: 1.2rem; height: 1.2rem;">
+                                                        <span class="visually-hidden">Na fila...</span>
+                                                    </div>
                                                     <span class="text-secondary fw-medium" style="font-size: 0.65rem;">Na fila</span>
                                                 </div>
                                             </template>
                                             <template x-if="entry.status === 'uploading'">
-                                                <div class="position-absolute top-0 start-0 w-100 h-100 d-flex flex-column align-items-center justify-content-center gap-1" style="background: rgba(15, 15, 35, 0.55);">
+                                                <div class="position-absolute top-0 start-0 w-100 h-100 d-flex flex-column align-items-center justify-content-center gap-1 bg-dark bg-opacity-50">
                                                      <span class="text-white fw-bold small" x-text="entry.progress + '%'"></span>
                                                      <div class="progress rounded-pill" style="height: 5px; width: 70%; background: rgba(255, 255, 255, 0.3);">
                                                          <div class="progress-bar bg-white rounded-pill"
@@ -142,15 +139,15 @@
                                                 </div>
                                             </template>
                                             <template x-if="entry.status === 'processing'">
-                                                <div class="position-absolute top-0 start-0 w-100 h-100 d-flex flex-column align-items-center justify-content-center gap-1" style="background: rgba(15, 15, 35, 0.65);">
-                                                    <span class="text-white fw-medium" style="font-size: 0.65rem;">Processando...</span>
-                                                    <div class="progress rounded-pill" style="height: 5px; width: 70%; background: rgba(255, 255, 255, 0.3);">
-                                                        <div class="progress-bar progress-bar-striped progress-bar-animated bg-white rounded-pill" style="width: 100%;"></div>
+                                                <div class="position-absolute top-0 start-0 w-100 h-100 d-flex flex-column align-items-center justify-content-center gap-1 bg-dark bg-opacity-50">
+                                                    <div class="spinner-border spinner-border-sm text-white" role="status" style="width: 1.2rem; height: 1.2rem;">
+                                                        <span class="visually-hidden">Processando...</span>
                                                     </div>
+                                                    <span class="text-white fw-medium" style="font-size: 0.65rem;">Processando...</span>
                                                 </div>
                                             </template>
                                             <template x-if="entry.status === 'error'">
-                                                <div class="position-absolute top-0 start-0 w-100 h-100 d-flex flex-column align-items-center justify-content-center gap-1" style="background: rgba(220, 53, 69, 0.75);">
+                                                <div class="position-absolute top-0 start-0 w-100 h-100 d-flex flex-column align-items-center justify-content-center gap-1 bg-danger bg-opacity-75">
                                                     <i class="bi bi-x-lg text-white fw-bold" style="font-size: 1.5rem; -webkit-text-stroke: 1.5px #fff;"></i>
                                                     <button type="button"
                                                             class="btn btn-sm btn-light rounded-pill px-2 py-0"
@@ -182,7 +179,7 @@
                                 </template>
                             </div>
                         </div>
-                    </template>
+                    </div>
                 </div>
             </template>
 
@@ -210,6 +207,7 @@
 @push('scripts')
     <script>
         // Mapa não-reativo para guardar File objects crus (proxy do Alpine quebra o FormData)
+        // Ainda necessário porque o upload envia o File original diretamente ao backend.
         var rawFiles = new Map();
 
         function orderUpload(initialState) {
@@ -276,163 +274,20 @@
 
                     var toUpload = files.slice(0, remaining);
                     toUpload.forEach(file => {
-                        const entryId = Date.now() + Math.random();
+                        const entryId = '' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
                         const entry = {
                             id: entryId,
                             fileName: file.name,
-                            previewUrl: '',
                             status: 'pending',
                             progress: 0,
                             errorMessage: '',
                         };
-                        // Guarda o File cru fora da reatividade do Alpine
                         rawFiles.set(entryId, file);
                         item.queue.push(entry);
-                        const reactiveEntry = item.queue[item.queue.length - 1];
-                        this.makePreview(file).then(url => { reactiveEntry.previewUrl = url; });
                         this.pendingJobs.push({ item, entryId });
                     });
 
                     this.pumpUploadQueue();
-                },
-
-                /**
-                 * Gera um preview minúsculo (192px) fora da thread principal.
-                 * Usar o arquivo original direto força o navegador a decodificar a
-                 * imagem inteira (vários megapixels) para um tile de 96px, travando
-                 * as animações das barras de progresso.
-                 */
-                async makePreview(file) {
-                    try {
-                        var img = new Image();
-                        var objectUrl = URL.createObjectURL(file);
-
-                        await new Promise(function(resolve, reject) {
-                            img.onload = resolve;
-                            img.onerror = function() { reject(new Error('Falha ao criar preview')); };
-                            img.src = objectUrl;
-                        });
-
-                        var ratio = Math.min(192 / img.naturalWidth, 192 / img.naturalHeight, 1);
-                        var canvas = document.createElement('canvas');
-                        canvas.width = Math.round(img.naturalWidth * ratio);
-                        canvas.height = Math.round(img.naturalHeight * ratio);
-                        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-
-                        URL.revokeObjectURL(objectUrl);
-                        img.src = '';
-
-                        return await new Promise(function(resolve) {
-                            canvas.toBlob(
-                                function(blob) { resolve(blob ? URL.createObjectURL(blob) : URL.createObjectURL(file)); },
-                                'image/jpeg',
-                                0.7
-                            );
-                        });
-                    } catch {
-                        return URL.createObjectURL(file);
-                    }
-                },
-
-                /**
-                 * Redimensiona a foto original no navegador antes do upload.
-                 * Fotos de 12MP+ (~5-15MB) são convertidas para JPEG 85% com
-                 * no máximo 3000px, resultando em ~1-3MB. Evita erro 413 em
-                 * produção onde o nginx tem client_max_body_size limitado.
-                 */
-                async resizeForUpload(file) {
-                    if (file.type === 'image/png') {
-                        // PNGs não redimensionamos (pode ter transparência)
-                        return file;
-                    }
-
-                    // Usa canvas para decodificar QUALQUER formato (HEIC, WebP, etc)
-                    // e sempre converter para JPEG — o backend só aceita JPG/PNG.
-                    var maxDim = 4000;
-                    var img = new Image();
-
-                    var objectUrl = URL.createObjectURL(file);
-
-                    try {
-                        await new Promise(function(resolve, reject) {
-                            img.onload = resolve;
-                            img.onerror = function() { reject(new Error('Falha ao decodificar imagem')); };
-                            img.src = objectUrl;
-                        });
-
-                        var ratio = Math.min(maxDim / img.naturalWidth, maxDim / img.naturalHeight, 1);
-                        var w = Math.round(img.naturalWidth * ratio);
-                        var h = Math.round(img.naturalHeight * ratio);
-
-                        var canvas = document.createElement('canvas');
-                        canvas.width = w;
-                        canvas.height = h;
-
-                        var ctx = canvas.getContext('2d');
-                        ctx.fillStyle = '#ffffff';
-                        ctx.fillRect(0, 0, w, h);
-                        ctx.drawImage(img, 0, 0, w, h);
-
-                        var blob = await new Promise(function(resolve) {
-                            canvas.toBlob(function(b) { resolve(b); }, 'image/jpeg', 0.85);
-                        });
-
-                        // Limpa memória
-                        img.src = '';
-                        canvas.width = 1;
-                        canvas.height = 1;
-
-                        return new File([blob], file.name.replace(/\.\w+$/, '.jpg'), { type: 'image/jpeg' });
-                    } catch {
-                        // Se não conseguiu decodificar, envia original e deixa o backend rejeitar
-                        return file;
-                    } finally {
-                        URL.revokeObjectURL(objectUrl);
-                    }
-                },
-
-                /**
-                 * Gera a miniatura (600px, JPEG) no navegador, fora da thread principal.
-                 * Evita o GD no servidor single-thread, que segurava a requisição
-                 * seguinte e deixava todo o fluxo síncrono.
-                 */
-                async makeThumbnail(file) {
-                    try {
-                        var img = new Image();
-                        var objectUrl = URL.createObjectURL(file);
-
-                        await new Promise(function(resolve, reject) {
-                            img.onload = resolve;
-                            img.onerror = function() { reject(new Error('Falha ao criar thumbnail')); };
-                            img.src = objectUrl;
-                        });
-
-                        var maxSize = 600;
-
-                        if (img.naturalWidth <= maxSize && img.naturalHeight <= maxSize) {
-                            URL.revokeObjectURL(objectUrl);
-                            return null; // Servidor usa a própria foto como miniatura
-                        }
-
-                        var ratio = Math.min(maxSize / img.naturalWidth, maxSize / img.naturalHeight);
-                        var canvas = document.createElement('canvas');
-                        canvas.width = Math.round(img.naturalWidth * ratio);
-                        canvas.height = Math.round(img.naturalHeight * ratio);
-
-                        var ctx = canvas.getContext('2d');
-                        ctx.fillStyle = '#ffffff';
-                        ctx.fillRect(0, 0, canvas.width, canvas.height);
-                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-                        URL.revokeObjectURL(objectUrl);
-                        img.src = '';
-
-                        return await new Promise(function(resolve) {
-                            canvas.toBlob(function(blob) { resolve(blob); }, 'image/jpeg', 0.82);
-                        });
-                    } catch {
-                        return null; // Fallback: servidor gera com GD
-                    }
                 },
 
                 pumpUploadQueue() {
@@ -445,11 +300,12 @@
                                 break;
                             }
                         }
-                        if (!entry) { continue; }
+                        if (!entry || entry.status === 'success') { continue; }
                         var rawFile = rawFiles.get(job.entryId);
                         if (!rawFile) { continue; }
                         this.activeUploads++;
                         entry.status = 'uploading';
+                        entry.progress = 0;
                         this.uploadFile(job.item, entry, rawFile);
                     }
                 },
@@ -460,7 +316,6 @@
                         item.queue.splice(index, 1);
                     }
                     rawFiles.delete(entry.id);
-                    setTimeout(() => { if (entry.previewUrl) URL.revokeObjectURL(entry.previewUrl); }, 1000);
                 },
 
                 retryUpload(item, entry) {
@@ -512,38 +367,28 @@
                     }
                 },
 
-                async uploadFile(item, entry, file) {
+                uploadFile(item, entry, file) {
+                    var self = this;
                     const formData = new FormData();
                     formData.append('order_item_id', item.id);
-
-                    // Redimensiona a foto original no frontend para evitar 413
-                    const optimizedFile = await this.resizeForUpload(file);
-                    formData.append('photo', optimizedFile);
-
-                    const thumbnail = await this.makeThumbnail(optimizedFile);
-                    if (thumbnail) {
-                        formData.append('thumbnail', thumbnail, 'thumb.jpg');
-                    }
-                    // Se não gerou thumbnail, o backend usará a original como fallback
+                    formData.append('photo', file);
 
                     const xhr = new XMLHttpRequest();
 
-                    xhr.upload.addEventListener('progress', (e) => {
+                    xhr.upload.addEventListener('progress', function(e) {
                         if (e.lengthComputable) {
                             const percent = Math.round((e.loaded / e.total) * 100);
-                            // Só atualiza o estado reativo quando o % inteiro muda (evita re-renders excessivos)
                             if (percent !== entry.progress) {
                                 entry.progress = percent;
                             }
                         }
                     });
 
-                    // Bytes enviados: agora o servidor converte a miniatura e salva
-                    xhr.upload.addEventListener('load', () => {
+                    xhr.upload.addEventListener('load', function() {
                         entry.status = 'processing';
                     });
 
-                    xhr.addEventListener('load', () => {
+                    xhr.addEventListener('load', function() {
                         if (xhr.status >= 200 && xhr.status < 300) {
                             try {
                                 const response = JSON.parse(xhr.responseText);
@@ -558,7 +403,7 @@
                                             removing: false,
                                         });
                                     }
-                                    this.removeQueueEntry(item, entry);
+                                    self.removeQueueEntry(item, entry);
                                 } else {
                                     entry.status = 'error';
                                     entry.errorMessage = response.message || 'Erro no upload.';
@@ -586,15 +431,14 @@
                         }
                     });
 
-                    xhr.addEventListener('error', () => {
+                    xhr.addEventListener('error', function() {
                         entry.status = 'error';
                         entry.errorMessage = 'Erro de conexão. Tente novamente.';
                     });
 
-                    // Libera a vaga na fila ao terminar (sucesso, erro ou abort)
-                    xhr.addEventListener('loadend', () => {
-                        this.activeUploads--;
-                        this.pumpUploadQueue();
+                    xhr.addEventListener('loadend', function() {
+                        self.activeUploads--;
+                        self.pumpUploadQueue();
                     });
 
                     xhr.open('POST', '{{ route("site.order.uploadPhoto", $order->id) }}');
