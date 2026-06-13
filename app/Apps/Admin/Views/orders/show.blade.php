@@ -114,83 +114,63 @@
                 </div>
             </div>
 
-              <!-- Photos List -->
+              <!-- Photos Cards -->
               @if($order->photosCount() > 0)
-                   <div class="bg-white rounded-4 p-4 border border-secondary-subtle shadow-sm mt-4">
+                   <div class="mt-4">
                       <h5 class="fw-bold text-dark mb-3">Fotos Recebidas ({{ $order->photosCount() }})</h5>
 
-                     <div class="table-responsive">
-                         <table class="table table-borderless align-middle mb-0">
-                             <thead class="bg-light">
-                                 <tr>
-                                     <th class="ps-3 py-2 text-secondary fw-semibold text-uppercase border-bottom border-secondary-subtle" style="font-size: 0.75rem;">Produto</th>
-                                     <th class="py-2 text-secondary fw-semibold text-uppercase border-bottom border-secondary-subtle" style="font-size: 0.75rem;">Fotos</th>
-                                     <th class="pe-3 py-2 text-end text-secondary fw-semibold text-uppercase border-bottom border-secondary-subtle" style="font-size: 0.75rem;">Ações</th>
-                                 </tr>
-                             </thead>
-                              <tbody>
-                                  @foreach($order->items as $item)
-                                      @if($item->photos->count() > 0)
-                                          @php
-                                              $itemPhotos = $item->photos->take(3);
-                                              $hasMorePhotos = $item->photos->count() > 3;
-                                              $itemPhotoUrls = [];
-                                              foreach($item->photos as $photo) {
-                                                  $itemPhotoUrls[] = [
-                                                      'url' => $photo->temporary_url,
-                                                      'name' => $photo->original_name
-                                                  ];
-                                              }
-                                          @endphp
-                                         <tr class="border-bottom border-light">
-                                             <td class="ps-3 py-3">
-                                                 <div class="fw-bold text-dark">
-                                                      {{ $item->product->name }}
-                                                 </div>
-                                                 <div class="mt-1">
-                                                     <span class="badge bg-secondary-subtle text-secondary-emphasis rounded-2 px-2 py-1 fw-medium small">
-                                                         {{ $item->photos->count() }}/{{ $item->photoLimit() }} fotos
-                                                     </span>
-                                                 </div>
-                                             </td>
-                                             <td class="py-3">
-                                                 <div class="d-flex gap-2 align-items-center">
-                                                     @foreach($itemPhotos as $photo)
-                                                         <a href="{{ $photo->temporary_url }}" target="_blank"
-                                                            class="text-decoration-none d-flex-shrink-0">
-                                                             <img src="{{ $photo->thumbnail_url }}"
-                                                                  alt="{{ $photo->original_name }}"
-                                                                  class="object-fit-cover rounded-3 border border-secondary-subtle"
-                                                                  style="width:48px;height:48px;transition:transform 0.2s ease;"
-                                                                  onmouseover="this.style.transform='scale(1.05)'"
-                                                                  onmouseout="this.style.transform='scale(1)'">
-                                                         </a>
-                                                     @endforeach
-                                                     @if($hasMorePhotos)
-                                                         <span class="text-body-secondary fw-semibold small">...</span>
-                                                     @endif
-                                                 </div>
-                                             </td>
-                                             <td class="pe-3 py-3 text-end">
-                                                  <button type="button"
-                                                          class="btn btn-outline-dark btn-sm rounded-3 px-3 fw-semibold d-flex align-items-center gap-2"
-                                                          :disabled="downloadingItemId !== null"
-                                                          data-urls='@json($itemPhotoUrls)'
-                                                          @click="downloadItemPhotos($el, {{ $item->id }})"
-                                                          style="transition: all 0.2s ease;"
-                                                          onmouseover="if(!this.disabled) this.style.transform='translateY(-1px)'"
-                                                          onmouseout="this.style.transform='translateY(0)'">
-                                                      <i class="bi bi-download"></i> Baixar
-                                                  </button>
-                                             </td>
-                                         </tr>
-                                     @endif
-                                 @endforeach
-                             </tbody>
-                         </table>
-                     </div>
-                 </div>
-             @endif
+                      @foreach($order->items as $item)
+                          @if($item->photos->count() > 0)
+                              @php
+                                  $itemPhotoUrls = [];
+                                  foreach($item->photos as $photo) {
+                                      $itemPhotoUrls[] = [
+                                          'url' => $photo->temporary_url,
+                                          'name' => $photo->original_name
+                                      ];
+                                  }
+                              @endphp
+
+                              <div class="bg-white rounded-4 p-4 border border-secondary-subtle shadow-sm mb-3">
+                                  <!-- Card Header: product name + download -->
+                                  <div class="d-flex justify-content-between align-items-center mb-3">
+                                      <div>
+                                          <span class="fw-bold text-dark">{{ $item->product->name }}</span>
+                                          <span class="badge bg-secondary-subtle text-secondary-emphasis rounded-2 px-2 py-1 fw-medium small ms-2">
+                                              {{ $item->photos->count() }}/{{ $item->photoLimit() }} fotos
+                                          </span>
+                                      </div>
+                                       <button type="button"
+                                               class="btn btn-outline-dark btn-sm rounded-3 px-3 fw-semibold d-flex align-items-center gap-2"
+                                               :disabled="downloadingItemId !== null"
+                                               data-urls='@json($itemPhotoUrls)'
+                                               @click="downloadItemPhotos($el, {{ $item->id }})"
+                                               style="transition: all 0.2s ease;"
+                                               onmouseover="if(!this.disabled) this.style.transform='translateY(-1px)'"
+                                               onmouseout="this.style.transform='translateY(0)'">
+                                           <i class="bi bi-download"></i> Baixar
+                                       </button>
+                                  </div>
+
+                                  <!-- Thumbnails grid -->
+                                  <div class="d-flex flex-wrap gap-2">
+                                      @foreach($item->photos as $photo)
+                                          <a href="{{ $photo->temporary_url }}" target="_blank"
+                                             class="text-decoration-none flex-shrink-0">
+                                              <img src="{{ $photo->thumbnail_url }}"
+                                                   alt="{{ $photo->original_name }}"
+                                                   class="object-fit-cover rounded-3 border border-secondary-subtle"
+                                                   style="width:72px;height:72px;transition:transform 0.2s ease;"
+                                                   onmouseover="this.style.transform='scale(1.08)'"
+                                                   onmouseout="this.style.transform='scale(1)'">
+                                          </a>
+                                      @endforeach
+                                  </div>
+                              </div>
+                          @endif
+                      @endforeach
+                  </div>
+              @endif
 
         </div>
 

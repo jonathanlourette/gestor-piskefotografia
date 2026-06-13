@@ -10,6 +10,7 @@ use App\Support\Action;
 use App\Support\Exceptions\BusinessException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
@@ -83,6 +84,12 @@ final class UploadOrderPhotoAction extends Action
             throw $e;
         } catch (\Throwable $e) {
             report($e);
+            Log::error('UploadOrderPhotoAction: upload failed', [
+                'order_id' => $this->data->get('order_id'),
+                'order_item_id' => $this->data->get('order_item_id'),
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
             throw new BusinessException('Não foi possível realizar o upload da foto. Tente novamente.');
         }
     }
